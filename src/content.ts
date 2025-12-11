@@ -206,9 +206,21 @@ function getPrefixSuffixAtCaret(el: HTMLElement): { prefix: string; suffixContex
 function applySuggestion(el: HTMLElement, suffix: string) {
   if (!suffix) return;
   if (el.isContentEditable) {
+    el.focus();
+    try {
+      if (typeof document.execCommand === "function") {
+        const ok = document.execCommand("insertText", false, suffix);
+        if (ok) {
+          return;
+        }
+      }
+    } catch {
+      // fall through to manual insertion
+    }
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) {
       el.innerText = (el.innerText || "") + suffix;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
       return;
     }
     const range = selection.getRangeAt(0);
@@ -219,6 +231,17 @@ function applySuggestion(el: HTMLElement, suffix: string) {
     range.setEndAfter(textNode);
     selection.removeAllRanges();
     selection.addRange(range);
+    if (typeof InputEvent !== "undefined") {
+      el.dispatchEvent(
+        new InputEvent("input", {
+          bubbles: true,
+          data: suffix,
+          inputType: "insertText"
+        } as any)
+      );
+    } else {
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     return;
   }
 
@@ -362,29 +385,33 @@ document.addEventListener(
 
 document.addEventListener(
   "keydown",
-  (event) => {
-    if (!currentInput || !config) return;
-    if (!currentSuggestionSuffix) return;
-
-    const isTabShortcut =
-      config.shortcutKey === "Tab" && event.key === "Tab" && !event.ctrlKey && !event.metaKey;
-    const isCtrlSpaceShortcut =
-      config.shortcutKey === "CtrlSpace" &&
-      event.ctrlKey &&
-      (event.code === "Space" || event.key === " " || event.key === "Spacebar" || event.key === "Space");
-
-    const shortcutMatches = isTabShortcut || isCtrlSpaceShortcut;
-
-    if (shortcutMatches) {
-      event.preventDefault();
-      applySuggestion(currentInput, currentSuggestionSuffix);
-      clearSuggestion();
-    } else if (event.key === "Escape") {
-      clearSuggestion();
-    }
-  },
+  handleKeydown,
   true
 );
+
+window.addEventListener("keydown", handleKeydown, true);
+
+function handleKeydown(event: KeyboardEvent) {
+  if (!currentInput || !config) return;
+  if (!currentSuggestionSuffix) return;
+
+  const isTabShortcut =
+    config.shortcutKey === "Tab" && event.key === "Tab" && !event.ctrlKey && !event.metaKey;
+  const isCtrlSpaceShortcut =
+    config.shortcutKey === "CtrlSpace" &&
+    event.ctrlKey &&
+    (event.code === "Space" || event.key === " " || event.key === "Spacebar" || event.key === "Space");
+
+  const shortcutMatches = isTabShortcut || isCtrlSpaceShortcut;
+
+  if (shortcutMatches) {
+    event.preventDefault();
+    applySuggestion(currentInput, currentSuggestionSuffix);
+    clearSuggestion();
+  } else if (event.key === "Escape") {
+    clearSuggestion();
+  }
+}
 
 window.addEventListener(
   "scroll",
