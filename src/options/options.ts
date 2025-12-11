@@ -18,6 +18,11 @@ const disabledSitesTextarea = document.getElementById("disabledSites") as HTMLTe
 const saveBtn = document.getElementById("save") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLSpanElement;
 
+function setStatus(message: string, isError = false) {
+  statusEl.textContent = message;
+  statusEl.style.color = isError ? "#c00" : "#0a7";
+}
+
 function parseSites(value: string): string[] {
   return value
     .split(/[\n,]/g)
@@ -62,19 +67,80 @@ async function load() {
 }
 
 saveBtn.addEventListener("click", async () => {
-  statusEl.textContent = "";
+  setStatus("");
+
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) {
+    setStatus("请填写 OpenAI API Key", true);
+    return;
+  }
+  if (!apiKey.startsWith("sk-")) {
+    const proceed = confirm("API Key 看起来不正确（应以 sk- 开头）。仍然保存吗？");
+    if (!proceed) return;
+  }
 
   const baseUrl = baseUrlInput.value.trim() || DEFAULT_CONFIG.baseUrl;
+  try {
+    new URL(baseUrl);
+  } catch {
+    setStatus("Base URL 无效", true);
+    return;
+  }
+
+  const maxTokensStr = maxOutputTokensInput.value.trim();
+  let maxOutputTokens = DEFAULT_CONFIG.maxOutputTokens;
+  if (maxTokensStr) {
+    const parsed = Number(maxTokensStr);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setStatus("最大补全长度需为正数", true);
+      return;
+    }
+    maxOutputTokens = parsed;
+  }
+
+  const tempStr = temperatureInput.value.trim();
+  let temperature = DEFAULT_CONFIG.temperature;
+  if (tempStr) {
+    const parsed = Number(tempStr);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 2) {
+      setStatus("温度需在 0~2 之间", true);
+      return;
+    }
+    temperature = parsed;
+  }
+
+  const debounceStr = debounceMsInput.value.trim();
+  let debounceMs = DEFAULT_CONFIG.debounceMs;
+  if (debounceStr) {
+    const parsed = Number(debounceStr);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setStatus("补全触发延迟需为非负数", true);
+      return;
+    }
+    debounceMs = parsed;
+  }
+
+  const minTriggerStr = minTriggerCharsInput.value.trim();
+  let minTriggerChars = DEFAULT_CONFIG.minTriggerChars;
+  if (minTriggerStr) {
+    const parsed = Number(minTriggerStr);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setStatus("最低触发字数需为非负数", true);
+      return;
+    }
+    minTriggerChars = parsed;
+  }
+
   await ensureOptionalHostPermission(baseUrl);
 
   const partial = {
-    apiKey: apiKeyInput.value.trim(),
+    apiKey,
     baseUrl,
     model: modelInput.value.trim() || DEFAULT_CONFIG.model,
-    maxOutputTokens: Number(maxOutputTokensInput.value) || DEFAULT_CONFIG.maxOutputTokens,
-    temperature: Number(temperatureInput.value) || DEFAULT_CONFIG.temperature,
-    debounceMs: Number(debounceMsInput.value) || DEFAULT_CONFIG.debounceMs,
-    minTriggerChars: Number(minTriggerCharsInput.value) || DEFAULT_CONFIG.minTriggerChars,
+    maxOutputTokens,
+    temperature,
+    debounceMs,
+    minTriggerChars,
     shortcutKey: shortcutKeySelect.value as ShortcutKey,
     sendUrl: sendUrlCheckbox.checked,
     sendTitle: sendTitleCheckbox.checked,
@@ -84,11 +150,14 @@ saveBtn.addEventListener("click", async () => {
     disabledSites: parseSites(disabledSitesTextarea.value)
   };
 
-  await saveConfig(partial);
-  statusEl.textContent = "已保存";
-  setTimeout(() => {
-    statusEl.textContent = "";
-  }, 2000);
+  try {
+    await saveConfig(partial);
+    setStatus("已保存");
+    setTimeout(() => setStatus(""), 2000);
+  } catch (error) {
+    console.error("Failed to save TabHere config", error);
+    setStatus("保存失败，请查看控制台", true);
+  }
 });
 
 load().catch((e) => {
