@@ -7,6 +7,9 @@
   "homepage_url": "https://github.com/scarletkc/TabHere",
   "minimum_chrome_version": "114",
   "default_locale": "en",
+  "action": {
+    "default_title": "__MSG_extName__"
+  },
   "icons": {
     "128": "public/icon-128.png"
   },

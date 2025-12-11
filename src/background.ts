@@ -10,9 +10,12 @@ type ClientCache = {
 
 const clientCache: ClientCache = {};
 
-chrome.action.onClicked.addListener(() => {
-  chrome.runtime.openOptionsPage();
-});
+const actionApi: any = (chrome as any).action || (chrome as any).browserAction;
+if (actionApi?.onClicked) {
+  actionApi.onClicked.addListener(() => {
+    chrome.runtime.openOptionsPage();
+  });
+}
 
 async function createOpenAIClient(): Promise<OpenAI> {
   const { apiKey, baseUrl } = await getConfig();
@@ -57,12 +60,14 @@ function extractOutputText(resp: any): string {
 }
 
 function buildPrompt(prefix: string, suffixContext?: string) {
-  const system =
-    "You are an intelligent input-method completion engine."
-    "Output only the natural continuation suffix of the user’s text."
-    "Do not rewrite, repeat, or correct the existing prefix."
-    "Do not add explanations. Do not answer questions."
-    "Requirements: 1) Do not rewrite the prefix; 2) Do not repeat the prefix; 3) Match the language/tone of the prefix; 4) Keep the length moderate.";
+  const system = `
+You are an intelligent input-method completion engine.
+Given a user’s text prefix, output only a natural continuation suffix.
+Do not modify, correct, or repeat the prefix.
+Do not answer questions or add explanations.
+Match the language, style, and tone of the prefix.
+Keep the completion moderately short.
+`;
   const user = [
     "Provide the completion suffix that follows the given prefix.",
     `Prefix: ${prefix}`,
