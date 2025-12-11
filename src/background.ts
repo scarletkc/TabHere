@@ -54,15 +54,15 @@ function extractOutputText(resp: any): string {
 
 function buildPrompt(prefix: string, suffixContext?: string) {
   const system =
-    "You are an intelligent input-method completion engine. \
-    Output only the natural continuation suffix of the user’s text; \
-    do not rewrite, repeat, or correct the existing prefix. \
-    Do not add explanations.";
+    "You are an intelligent input-method completion engine."
+    "Output only the natural continuation suffix of the user’s text."
+    "Do not rewrite, repeat, or correct the existing prefix."
+    "Do not add explanations. Do not answer questions."
+    "Requirements: 1) Do not rewrite the prefix; 2) Do not repeat the prefix; 3) Match the language/tone of the prefix; 4) Keep the length moderate.";
   const user = [
     "Provide the completion suffix that follows the given prefix.",
-    "Requirements: 1) Do not rewrite the prefix; 2) Do not repeat the prefix; 3) Match the language/tone of the prefix; 4) Keep the length moderate.",
     `Prefix: ${prefix}`,
-    suffixContext ? `Subsequent context (optional): ${suffixContext}` : "",
+    suffixContext ? `Subsequent context: ${suffixContext}` : "",
     "Return only the suffix text:"
   ]
     .filter(Boolean)

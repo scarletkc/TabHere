@@ -55,8 +55,6 @@ const DEFAULT_CONFIG: TabHereConfig = {
   debounceMs: 500,
   minTriggerChars: 3,
   shortcutKey: "Tab",
-  sendUrl: false,
-  sendTitle: false,
   useSync: true,
   disabledSites: [],
   enabledSites: [],
@@ -72,8 +70,6 @@ const CONFIG_KEYS = [
   "tabhere_debounce_ms",
   "tabhere_min_trigger_chars",
   "tabhere_shortcut_key",
-  "tabhere_send_url",
-  "tabhere_send_title",
   "tabhere_use_sync",
   "tabhere_disabled_sites",
   "tabhere_enabled_sites",
@@ -89,8 +85,6 @@ type ConfigStorageShape = {
   tabhere_debounce_ms?: number;
   tabhere_min_trigger_chars?: number;
   tabhere_shortcut_key?: TabHereConfig["shortcutKey"];
-  tabhere_send_url?: boolean;
-  tabhere_send_title?: boolean;
   tabhere_use_sync?: boolean;
   tabhere_disabled_sites?: string[];
   tabhere_enabled_sites?: string[];
@@ -128,8 +122,6 @@ async function getConfigLocal(): Promise<TabHereConfig> {
     debounceMs: res.tabhere_debounce_ms ?? DEFAULT_CONFIG.debounceMs,
     minTriggerChars: res.tabhere_min_trigger_chars ?? DEFAULT_CONFIG.minTriggerChars,
     shortcutKey: res.tabhere_shortcut_key || DEFAULT_CONFIG.shortcutKey,
-    sendUrl: res.tabhere_send_url ?? DEFAULT_CONFIG.sendUrl,
-    sendTitle: res.tabhere_send_title ?? DEFAULT_CONFIG.sendTitle,
     useSync,
     disabledSites: res.tabhere_disabled_sites ?? DEFAULT_CONFIG.disabledSites,
     enabledSites: res.tabhere_enabled_sites ?? DEFAULT_CONFIG.enabledSites,
@@ -375,8 +367,6 @@ function scheduleSuggest() {
       requestId,
       prefix,
       suffixContext,
-      url: config.sendUrl ? location.href : undefined,
-      title: config.sendTitle ? document.title : undefined,
       maxOutputTokens: config.maxOutputTokens
     };
 

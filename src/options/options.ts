@@ -38,8 +38,6 @@ const temperatureInput = document.getElementById("temperature") as HTMLInputElem
 const debounceMsInput = document.getElementById("debounceMs") as HTMLInputElement;
 const minTriggerCharsInput = document.getElementById("minTriggerChars") as HTMLInputElement;
 const shortcutKeySelect = document.getElementById("shortcutKey") as HTMLSelectElement;
-const sendUrlCheckbox = document.getElementById("sendUrl") as HTMLInputElement;
-const sendTitleCheckbox = document.getElementById("sendTitle") as HTMLInputElement;
 const useSyncCheckbox = document.getElementById("useSync") as HTMLInputElement;
 const disableOnSensitiveCheckbox = document.getElementById("disableOnSensitive") as HTMLInputElement;
 const enabledSitesTextarea = document.getElementById("enabledSites") as HTMLTextAreaElement;
@@ -87,8 +85,6 @@ async function load() {
   debounceMsInput.value = String(cfg.debounceMs);
   minTriggerCharsInput.value = String(cfg.minTriggerChars);
   shortcutKeySelect.value = cfg.shortcutKey;
-  sendUrlCheckbox.checked = cfg.sendUrl;
-  sendTitleCheckbox.checked = cfg.sendTitle;
   useSyncCheckbox.checked = cfg.useSync;
   disableOnSensitiveCheckbox.checked = cfg.disableOnSensitive;
   enabledSitesTextarea.value = cfg.enabledSites.join("\n");
@@ -171,8 +167,6 @@ saveBtn.addEventListener("click", async () => {
     debounceMs,
     minTriggerChars,
     shortcutKey: shortcutKeySelect.value as ShortcutKey,
-    sendUrl: sendUrlCheckbox.checked,
-    sendTitle: sendTitleCheckbox.checked,
     useSync: useSyncCheckbox.checked,
     disableOnSensitive: disableOnSensitiveCheckbox.checked,
     enabledSites: parseSites(enabledSitesTextarea.value),

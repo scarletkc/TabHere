@@ -25,8 +25,6 @@
   "shortcutTabOption": { "message": "Tab" },
   "shortcutCtrlSpaceOption": { "message": "Ctrl + Space" },
 
-  "sendUrlLabel": { "message": "Send page URL as context" },
-  "sendTitleLabel": { "message": "Send page title as context" },
   "useSyncLabel": { "message": "Sync settings & API key (chrome.storage.sync)" },
   "disableSensitiveLabel": { "message": "Disable on sensitive inputs (password/OTP)" },
 
@@ -61,4 +59,3 @@
   },
   "errorSaveFailed": { "message": "Save failed. Check the console." }
 }
-

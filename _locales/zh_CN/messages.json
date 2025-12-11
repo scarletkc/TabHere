@@ -25,8 +25,6 @@
   "shortcutTabOption": { "message": "Tab" },
   "shortcutCtrlSpaceOption": { "message": "Ctrl + Space" },
 
-  "sendUrlLabel": { "message": "发送 URL 作为上下文" },
-  "sendTitleLabel": { "message": "发送页面标题作为上下文" },
   "useSyncLabel": { "message": "同步设置与 API Key（chrome.storage.sync）" },
   "disableSensitiveLabel": { "message": "在敏感输入框禁用（如密码/验证码）" },
 
@@ -59,4 +57,3 @@
   },
   "errorSaveFailed": { "message": "保存失败，请查看控制台" }
 }
-

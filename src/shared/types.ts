@@ -5,8 +5,6 @@ export type SuggestionRequestMessage = {
   suffixContext?: string;
   cursorOffset?: number;
   languageHint?: string;
-  url?: string;
-  title?: string;
   maxOutputTokens?: number;
 };
 
@@ -28,11 +26,8 @@ export type TabHereConfig = {
   debounceMs: number;
   minTriggerChars: number;
   shortcutKey: ShortcutKey;
-  sendUrl: boolean;
-  sendTitle: boolean;
   useSync: boolean;
   disabledSites: string[];
   enabledSites: string[];
   disableOnSensitive: boolean;
 };
-
