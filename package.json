@@ -1,12 +1,13 @@
 {
   "name": "tabhere",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
     "postbuild": "node scripts/copy-locales.mjs",
+    "package": "node scripts/package.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
