@@ -15,6 +15,12 @@ let lastFailureAt = 0;
 
 const overlay = new SuggestionOverlay();
 
+function getRuntime(): chrome.runtime.Runtime | null {
+  const anyGlobal = globalThis as any;
+  const runtime = (anyGlobal.chrome && anyGlobal.chrome.runtime) || (anyGlobal.browser && anyGlobal.browser.runtime);
+  return runtime && typeof runtime.sendMessage === "function" ? (runtime as chrome.runtime.Runtime) : null;
+}
+
 async function refreshConfig() {
   config = await getConfigLocal();
 }
@@ -265,7 +271,13 @@ function scheduleSuggest() {
       maxOutputTokens: config.maxOutputTokens
     };
 
-    chrome.runtime.sendMessage(message, (res: SuggestionResponseMessage) => {
+    const runtime = getRuntime();
+    if (!runtime) {
+      clearSuggestion();
+      return;
+    }
+
+    runtime.sendMessage(message, (res: SuggestionResponseMessage) => {
       if (!res || res.error || res.requestId !== latestRequestId) {
         lastFailureAt = Date.now();
         clearSuggestion();
