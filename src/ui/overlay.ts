@@ -8,10 +8,18 @@ export class SuggestionOverlay {
       position: "fixed",
       pointerEvents: "none",
       zIndex: "2147483647",
-      color: "rgba(120,120,120,0.8)",
+      color: "rgba(255,255,255,0.95)",
+      background: "rgba(0,0,0,0.75)",
+      padding: "4px 6px",
+      borderRadius: "6px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+      fontFamily: "system-ui, sans-serif",
+      fontSize: "14px",
+      lineHeight: "1.4",
       whiteSpace: "pre-wrap",
+      wordBreak: "break-word",
       visibility: "hidden",
-      maxWidth: "80vw"
+      maxWidth: "360px"
     } as CSSStyleDeclaration);
     document.documentElement.appendChild(this.overlay);
   }
@@ -29,17 +37,34 @@ export class SuggestionOverlay {
         return;
       }
 
-      const computed = window.getComputedStyle(target);
-      this.overlay.style.fontFamily = computed.fontFamily;
-      this.overlay.style.fontSize = computed.fontSize;
-      this.overlay.style.fontWeight = computed.fontWeight;
-      this.overlay.style.lineHeight = computed.lineHeight;
-      this.overlay.style.letterSpacing = computed.letterSpacing;
-      this.overlay.style.textAlign = computed.textAlign;
-
       this.overlay.textContent = suffix;
-      this.overlay.style.left = `${caretRect.left}px`;
-      this.overlay.style.top = `${caretRect.top}px`;
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const margin = 8;
+      const maxWidth = Math.min(360, Math.max(120, viewportWidth - margin * 2));
+      this.overlay.style.maxWidth = `${maxWidth}px`;
+      this.overlay.style.maxHeight = `${Math.max(80, viewportHeight / 2)}px`;
+      this.overlay.style.overflowY = "auto";
+
+      // Measure after text/maxWidth set.
+      const overlayRect = this.overlay.getBoundingClientRect();
+
+      let left = caretRect.left;
+      let top = caretRect.bottom + 6;
+
+      if (left + overlayRect.width > viewportWidth - margin) {
+        left = viewportWidth - margin - overlayRect.width;
+      }
+      if (left < margin) left = margin;
+
+      if (top + overlayRect.height > viewportHeight - margin) {
+        top = caretRect.top - overlayRect.height - 6;
+      }
+      if (top < margin) top = margin;
+
+      this.overlay.style.left = `${left}px`;
+      this.overlay.style.top = `${top}px`;
       this.overlay.style.visibility = "visible";
     } catch {
       this.hide();

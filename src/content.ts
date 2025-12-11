@@ -12,6 +12,7 @@ let isComposing = false;
 let debounceTimer: number | null = null;
 let config: TabHereConfig | null = null;
 let lastFailureAt = 0;
+let contextInvalidated = false;
 
 const overlay = new SuggestionOverlay();
 
@@ -26,7 +27,18 @@ function getRuntime(): RuntimeLike | null {
 }
 
 async function refreshConfig() {
-  config = await getConfigLocal();
+  if (contextInvalidated) return;
+  try {
+    config = await getConfigLocal();
+  } catch (error) {
+    if (isExtensionContextInvalidated(error)) {
+      contextInvalidated = true;
+      config = null;
+      clearSuggestion();
+      return;
+    }
+    throw error;
+  }
 }
 
 refreshConfig().catch(console.error);
@@ -87,7 +99,14 @@ type ConfigStorageShape = {
 
 function storageGet<T>(area: chrome.storage.StorageArea, keys: readonly string[]): Promise<T> {
   return new Promise((resolve) => {
-    area.get(keys as any, (res) => resolve(res as T));
+    try {
+      area.get(keys as any, (res) => resolve(res as T));
+    } catch (error) {
+      if (isExtensionContextInvalidated(error)) {
+        contextInvalidated = true;
+      }
+      resolve({} as T);
+    }
   });
 }
 
@@ -122,6 +141,55 @@ function getEventTarget(event: Event): HTMLElement | null {
   const path = (event as any).composedPath?.() as EventTarget[] | undefined;
   const target = (path && path[0]) || event.target;
   return target instanceof HTMLElement ? target : null;
+}
+
+const OVERLAY_ATTR = "data-tabhare-overlay";
+
+function findContentEditableRoot(el: HTMLElement): HTMLElement {
+  let node: HTMLElement | null = el;
+  let root: HTMLElement = el;
+  while (node && node.isContentEditable) {
+    if (node.getAttribute("contenteditable") !== null) {
+      root = node;
+    }
+    node = node.parentElement;
+  }
+  return root;
+}
+
+function resolveEditableTarget(el: HTMLElement | null): HTMLElement | null {
+  if (!el) return null;
+  if (el.closest?.(`[${OVERLAY_ATTR}]`)) return null;
+
+  if (isEditableElement(el)) {
+    return el.isContentEditable ? findContentEditableRoot(el) : el;
+  }
+
+  const ancestor = el.closest?.(
+    "textarea, input, [contenteditable='true'], [contenteditable=''], [contenteditable='plaintext-only']"
+  ) as HTMLElement | null;
+
+  if (ancestor && isEditableElement(ancestor)) {
+    return ancestor.isContentEditable ? findContentEditableRoot(ancestor) : ancestor;
+  }
+
+  return null;
+}
+
+function getEditableFromEvent(event: Event): HTMLElement | null {
+  const direct = resolveEditableTarget(getEventTarget(event));
+  if (direct) return direct;
+
+  const path = (event as any).composedPath?.() as EventTarget[] | undefined;
+  if (path) {
+    for (const node of path) {
+      if (node instanceof HTMLElement) {
+        const resolved = resolveEditableTarget(node);
+        if (resolved) return resolved;
+      }
+    }
+  }
+  return null;
 }
 
 function isSensitiveInput(el: HTMLElement, cfg: TabHereConfig): boolean {
@@ -276,6 +344,7 @@ function clearSuggestion() {
 
 function scheduleSuggest() {
   if (!currentInput || !config) return;
+  if (contextInvalidated) return;
   if (!isSiteAllowed(config)) return;
   if (isSensitiveInput(currentInput, config)) return;
 
@@ -316,50 +385,116 @@ function scheduleSuggest() {
       clearSuggestion();
       return;
     }
-
-    runtime.sendMessage(message, (res: SuggestionResponseMessage) => {
-      if (!res || res.error || res.requestId !== latestRequestId) {
-        lastFailureAt = Date.now();
+    try {
+      runtime.sendMessage(message, (res: SuggestionResponseMessage) => {
+        if (!res || res.error || res.requestId !== latestRequestId) {
+          lastFailureAt = Date.now();
+          clearSuggestion();
+          return;
+        }
+        currentSuggestionSuffix = res.suffix || "";
+        overlay.update(currentInput, currentSuggestionSuffix);
+      });
+    } catch (error) {
+      if (isExtensionContextInvalidated(error)) {
+        contextInvalidated = true;
         clearSuggestion();
-        return;
       }
-      currentSuggestionSuffix = res.suffix || "";
-      overlay.update(currentInput, currentSuggestionSuffix);
-    });
+    }
   }, config.debounceMs);
 }
 
-document.addEventListener(
-  "focusin",
-  (event) => {
-    const target = getEventTarget(event);
-    if (!target || !config) return;
-    if (isEditableElement(target) && isSiteAllowed(config) && !isSensitiveInput(target, config)) {
-      currentInput = target;
-      clearSuggestion();
-      scheduleSuggest();
-    } else {
-      currentInput = null;
-      clearSuggestion();
-    }
-  },
-  true
-);
+function handleFocusIn(event: Event) {
+  const editable = getEditableFromEvent(event);
+  if (!editable) {
+    currentInput = null;
+    clearSuggestion();
+    return;
+  }
+  if (config && (!isSiteAllowed(config) || isSensitiveInput(editable, config))) {
+    currentInput = null;
+    clearSuggestion();
+    return;
+  }
+  currentInput = editable;
+  clearSuggestion();
+  scheduleSuggest();
+}
+
+document.addEventListener("focusin", handleFocusIn, true);
+window.addEventListener("focusin", handleFocusIn, true);
 
 document.addEventListener(
   "focusout",
-  () => {
+  (event) => {
+    const nextTarget = (event as FocusEvent).relatedTarget as HTMLElement | null;
+    if (currentInput && nextTarget && currentInput.contains(nextTarget)) {
+      return;
+    }
     currentInput = null;
     clearSuggestion();
   },
   true
 );
 
+function handleInput(event: Event) {
+  const editable = getEditableFromEvent(event);
+  if (!editable) return;
+  currentInput = editable;
+  clearSuggestion();
+  scheduleSuggest();
+}
+
+document.addEventListener("input", handleInput, true);
+window.addEventListener("input", handleInput, true);
+
+function handleBeforeInput(event: Event) {
+  const editable = getEditableFromEvent(event);
+  if (!editable) return;
+  currentInput = editable;
+  clearSuggestion();
+  scheduleSuggest();
+}
+
+document.addEventListener("beforeinput", handleBeforeInput, true);
+window.addEventListener("beforeinput", handleBeforeInput, true);
+
+function handleKeyup(event: Event) {
+  const editable = getEditableFromEvent(event);
+  if (!editable) return;
+
+  const keyEvent = event as KeyboardEvent;
+  const isEditingKey =
+    keyEvent.key.length === 1 ||
+    keyEvent.key === "Backspace" ||
+    keyEvent.key === "Delete" ||
+    keyEvent.key === "Enter";
+  if (!isEditingKey) return;
+
+  currentInput = editable;
+  clearSuggestion();
+  scheduleSuggest();
+}
+
+document.addEventListener("keyup", handleKeyup, true);
+window.addEventListener("keyup", handleKeyup, true);
+
 document.addEventListener(
-  "input",
-  (event) => {
-    const target = getEventTarget(event);
-    if (!target || target !== currentInput) return;
+  "selectionchange",
+  () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const anchorNode = selection.anchorNode;
+    if (!anchorNode) return;
+    const anchorElement =
+      anchorNode instanceof HTMLElement ? anchorNode : anchorNode.parentElement;
+    if (!anchorElement) return;
+
+    const editable = resolveEditableTarget(anchorElement);
+    if (!editable) return;
+    if (config && (isSensitiveInput(editable, config) || !isSiteAllowed(config))) return;
+
+    currentInput = editable;
     clearSuggestion();
     scheduleSuggest();
   },
@@ -394,6 +529,7 @@ window.addEventListener("keydown", handleKeydown, true);
 function handleKeydown(event: KeyboardEvent) {
   if (!currentInput || !config) return;
   if (!currentSuggestionSuffix) return;
+  if (contextInvalidated) return;
 
   const isTabShortcut =
     config.shortcutKey === "Tab" && event.key === "Tab" && !event.ctrlKey && !event.metaKey;
@@ -411,6 +547,14 @@ function handleKeydown(event: KeyboardEvent) {
   } else if (event.key === "Escape") {
     clearSuggestion();
   }
+}
+
+function isExtensionContextInvalidated(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    typeof error.message === "string" &&
+    error.message.includes("Extension context invalidated")
+  );
 }
 
 window.addEventListener(
