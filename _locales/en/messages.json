@@ -1,0 +1,64 @@
+{
+  "extName": { "message": "TabHere - AI Autocomplete" },
+  "extDesc": { "message": "AI autocomplete in any text box." },
+
+  "optPageTitle": { "message": "TabHere Settings" },
+  "optHeading": { "message": "TabHere Settings" },
+
+  "apiKeyLabel": { "message": "OpenAI API Key" },
+  "apiKeyPlaceholder": { "message": "sk-..." },
+  "apiKeyHint": { "message": "Your key is stored locally in browser storage." },
+
+  "baseUrlLabel": { "message": "Base URL" },
+  "baseUrlPlaceholder": { "message": "https://api.openai.com/v1" },
+
+  "modelLabel": { "message": "Model ID" },
+  "modelPlaceholder": { "message": "gpt-5.2-mini" },
+
+  "maxTokensLabel": { "message": "Max completion length (tokens)" },
+  "temperatureLabel": { "message": "Temperature" },
+
+  "debounceLabel": { "message": "Trigger delay (ms)" },
+  "minTriggerLabel": { "message": "Minimum trigger characters" },
+
+  "shortcutLabel": { "message": "Shortcut" },
+  "shortcutTabOption": { "message": "Tab" },
+  "shortcutCtrlSpaceOption": { "message": "Ctrl + Space" },
+
+  "sendUrlLabel": { "message": "Send page URL as context" },
+  "sendTitleLabel": { "message": "Send page title as context" },
+  "useSyncLabel": { "message": "Sync settings & API key (chrome.storage.sync)" },
+  "disableSensitiveLabel": { "message": "Disable on sensitive inputs (password/OTP)" },
+
+  "enabledSitesLabel": {
+    "message": "Allowed sites (comma/newline separated, empty = all sites)"
+  },
+  "enabledSitesPlaceholder": { "message": "example.com" },
+
+  "disabledSitesLabel": { "message": "Blocked sites (comma/newline separated)" },
+  "disabledSitesPlaceholder": {
+    "message": "bank.com, mail.example.com"
+  },
+
+  "saveButtonLabel": { "message": "Save" },
+  "statusSaved": { "message": "Saved" },
+
+  "errorApiKeyEmpty": { "message": "Please enter your OpenAI API key." },
+  "confirmApiKeyInvalid": {
+    "message": "This API key doesn't look right (should start with sk-). Save anyway?"
+  },
+  "errorBaseUrlInvalid": { "message": "Base URL is invalid." },
+  "errorMaxTokensInvalid": { "message": "Max tokens must be a positive number." },
+  "errorTemperatureInvalid": { "message": "Temperature must be between 0 and 2." },
+  "errorDebounceInvalid": {
+    "message": "Trigger delay must be a non-negative number."
+  },
+  "errorMinTriggerInvalid": {
+    "message": "Minimum trigger characters must be non-negative."
+  },
+  "warningOptionalPermissionDenied": {
+    "message": "Optional permission for custom Base URL was not granted; requests may fail."
+  },
+  "errorSaveFailed": { "message": "Save failed. Check the console." }
+}
+

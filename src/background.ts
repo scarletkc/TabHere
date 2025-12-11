@@ -54,13 +54,16 @@ function extractOutputText(resp: any): string {
 
 function buildPrompt(prefix: string, suffixContext?: string) {
   const system =
-    "你是一个智能输入法补全引擎。只输出用户文本的自然续写后缀，不要改写、重复或纠正已有前缀。不要添加解释。";
+    "You are an intelligent input-method completion engine. \
+    Output only the natural continuation suffix of the user’s text; \
+    do not rewrite, repeat, or correct the existing prefix. \
+    Do not add explanations.";
   const user = [
-    "给出接在前缀后的补全后缀。",
-    "要求：1) 不改写前缀；2) 不重复前缀；3) 语言/语气与前缀一致；4) 长度适中。",
-    `前缀：${prefix}`,
-    suffixContext ? `后文上下文（可选）：${suffixContext}` : "",
-    "只返回后缀文本："
+    "Provide the completion suffix that follows the given prefix.",
+    "Requirements: 1) Do not rewrite the prefix; 2) Do not repeat the prefix; 3) Match the language/tone of the prefix; 4) Keep the length moderate.",
+    `Prefix: ${prefix}`,
+    suffixContext ? `Subsequent context (optional): ${suffixContext}` : "",
+    "Return only the suffix text:"
   ]
     .filter(Boolean)
     .join("\n");
