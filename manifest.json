@@ -3,6 +3,9 @@
   "name": "TabHere - AI Autocomplete",
   "version": "0.2.0",
   "description": "在任意网页输入框中使用 AI 进行 Tab 自动补全。",
+  "author": "ScarletKc",
+  "homepage_url": "https://github.com/scarletkc/TabHere",
+  "minimum_chrome_version": "114",
   "icons": {
     "128": "public/icon-128.png"
   },
