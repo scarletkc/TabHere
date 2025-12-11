@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "TabHere - AI Autocomplete",
+  "version": "0.2.0",
+  "description": "在任意网页输入框中使用 OpenAI 进行 Tab 自动补全。",
+  "icons": {
+    "128": "public/icon-128.png"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["https://api.openai.com/*"],
+  "optional_host_permissions": ["*://*/v1/*"],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "options_page": "dist/options/options.html",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
+

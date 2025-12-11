@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TabHere 设置</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 24px;
+        max-width: 860px;
+      }
+      h1 {
+        margin-top: 0;
+        font-size: 20px;
+      }
+      .section {
+        margin-top: 20px;
+        padding-top: 12px;
+        border-top: 1px solid #eee;
+      }
+      label {
+        display: block;
+        margin: 10px 0;
+        font-size: 14px;
+      }
+      input[type="text"],
+      input[type="password"],
+      input[type="number"],
+      textarea,
+      select {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px;
+        margin-top: 6px;
+        font-size: 14px;
+      }
+      textarea {
+        min-height: 60px;
+        resize: vertical;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      button {
+        margin-top: 16px;
+        padding: 8px 14px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      #status {
+        margin-left: 12px;
+        font-size: 13px;
+        color: #0a7;
+      }
+      .hint {
+        color: #666;
+        font-size: 12px;
+        margin-top: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>TabHere 设置</h1>
+
+    <div class="section">
+      <label>
+        OpenAI API Key
+        <input id="apiKey" type="password" placeholder="sk-..." />
+        <div class="hint">Key 仅保存在本地浏览器存储中。</div>
+      </label>
+
+      <div class="row">
+        <label>
+          Base URL
+          <input id="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
+        </label>
+
+        <label>
+          模型 ID
+          <input id="model" type="text" placeholder="gpt-5.2-mini" />
+        </label>
+      </div>
+
+      <div class="row">
+        <label>
+          最大补全长度（tokens）
+          <input id="maxOutputTokens" type="number" min="1" max="512" />
+        </label>
+
+        <label>
+          温度（temperature）
+          <input id="temperature" type="number" min="0" max="2" step="0.1" />
+        </label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="row">
+        <label>
+          补全触发延迟（ms）
+          <input id="debounceMs" type="number" min="0" step="50" />
+        </label>
+
+        <label>
+          最低触发字数
+          <input id="minTriggerChars" type="number" min="0" step="1" />
+        </label>
+      </div>
+
+      <label>
+        快捷键
+        <select id="shortcutKey">
+          <option value="Tab">Tab</option>
+          <option value="CtrlSpace">Ctrl + Space</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="section">
+      <label class="checkbox">
+        <input id="sendUrl" type="checkbox" />
+        发送 URL 作为上下文
+      </label>
+      <label class="checkbox">
+        <input id="sendTitle" type="checkbox" />
+        发送页面标题作为上下文
+      </label>
+      <label class="checkbox">
+        <input id="useSync" type="checkbox" />
+        同步设置与 API Key（chrome.storage.sync）
+      </label>
+      <label class="checkbox">
+        <input id="disableOnSensitive" type="checkbox" />
+        在敏感输入框禁用（如密码/验证码）
+      </label>
+    </div>
+
+    <div class="section">
+      <label>
+        站点白名单（逗号或换行分隔，留空表示全站启用）
+        <textarea id="enabledSites" placeholder="example.com"></textarea>
+      </label>
+      <label>
+        站点黑名单（逗号或换行分隔）
+        <textarea id="disabledSites" placeholder="bank.com, mail.example.com"></textarea>
+      </label>
+    </div>
+
+    <button id="save" type="button">保存设置</button>
+    <span id="status"></span>
+
+    <script type="module" src="./options.ts"></script>
+  </body>
+</html>
+

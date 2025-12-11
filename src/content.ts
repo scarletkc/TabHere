@@ -1,0 +1,287 @@
+import { SuggestionOverlay } from "./ui/overlay";
+import { getConfig } from "./shared/config";
+import type {
+  SuggestionRequestMessage,
+  SuggestionResponseMessage,
+  TabHereConfig
+} from "./shared/types";
+
+let currentInput: HTMLElement | null = null;
+let currentSuggestionSuffix = "";
+let latestRequestId: string | null = null;
+let isComposing = false;
+let debounceTimer: number | null = null;
+let config: TabHereConfig | null = null;
+let lastFailureAt = 0;
+
+const overlay = new SuggestionOverlay();
+
+async function refreshConfig() {
+  config = await getConfig();
+}
+
+refreshConfig().catch(console.error);
+chrome.storage.onChanged.addListener(() => {
+  refreshConfig().catch(console.error);
+});
+
+function getEventTarget(event: Event): HTMLElement | null {
+  const path = (event as any).composedPath?.() as EventTarget[] | undefined;
+  const target = (path && path[0]) || event.target;
+  return target instanceof HTMLElement ? target : null;
+}
+
+function isSensitiveInput(el: HTMLElement, cfg: TabHereConfig): boolean {
+  if (!cfg.disableOnSensitive) {
+    return false;
+  }
+  if (el instanceof HTMLInputElement) {
+    const type = (el.type || "").toLowerCase();
+    if (type === "password") return true;
+  }
+  const autocomplete = el.getAttribute("autocomplete") || "";
+  const sensitiveAutocomplete = [
+    "one-time-code",
+    "cc-number",
+    "cc-csc",
+    "cc-exp",
+    "new-password",
+    "current-password"
+  ];
+  return sensitiveAutocomplete.some((key) => autocomplete.includes(key));
+}
+
+function isEditableElement(el: HTMLElement): boolean {
+  if (el.isContentEditable) return true;
+  if (el instanceof HTMLTextAreaElement) return true;
+  if (el instanceof HTMLInputElement) {
+    const type = (el.type || "text").toLowerCase();
+    const allowedTypes = ["text", "search", "email", "url", "tel", "number"];
+    return allowedTypes.includes(type);
+  }
+  return false;
+}
+
+function isSiteAllowed(cfg: TabHereConfig): boolean {
+  const host = location.hostname;
+  if (cfg.disabledSites.some((d) => host === d || host.endsWith(`.${d}`))) {
+    return false;
+  }
+  if (cfg.enabledSites.length > 0) {
+    return cfg.enabledSites.some((d) => host === d || host.endsWith(`.${d}`));
+  }
+  return true;
+}
+
+function getInputText(el: HTMLElement): string {
+  if (el.isContentEditable) {
+    return el.innerText || "";
+  }
+  return (el as HTMLInputElement | HTMLTextAreaElement).value || "";
+}
+
+function getPrefixSuffixAtCaret(el: HTMLElement): { prefix: string; suffixContext: string } {
+  if (el.isContentEditable) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      const fullText = getInputText(el);
+      return { prefix: fullText, suffixContext: "" };
+    }
+    const range = selection.getRangeAt(0);
+    const beforeRange = range.cloneRange();
+    beforeRange.selectNodeContents(el);
+    beforeRange.setEnd(range.endContainer, range.endOffset);
+    const prefix = beforeRange.toString();
+
+    const afterRange = range.cloneRange();
+    afterRange.selectNodeContents(el);
+    afterRange.setStart(range.endContainer, range.endOffset);
+    const suffixContext = afterRange.toString();
+    return { prefix, suffixContext };
+  }
+
+  const input = el as HTMLInputElement | HTMLTextAreaElement;
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? start;
+  const value = input.value || "";
+  return {
+    prefix: value.slice(0, start),
+    suffixContext: value.slice(end)
+  };
+}
+
+function applySuggestion(el: HTMLElement, suffix: string) {
+  if (!suffix) return;
+  if (el.isContentEditable) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      el.innerText = (el.innerText || "") + suffix;
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const textNode = document.createTextNode(suffix);
+    range.insertNode(textNode);
+    range.setStartAfter(textNode);
+    range.setEndAfter(textNode);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return;
+  }
+
+  const input = el as HTMLInputElement | HTMLTextAreaElement;
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? start;
+  const value = input.value || "";
+  const nextValue = value.slice(0, start) + suffix + value.slice(end);
+  input.value = nextValue;
+  const caret = start + suffix.length;
+  input.setSelectionRange(caret, caret);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function clearSuggestion() {
+  currentSuggestionSuffix = "";
+  overlay.hide();
+}
+
+function scheduleSuggest() {
+  if (!currentInput || !config) return;
+  if (!isSiteAllowed(config)) return;
+  if (isSensitiveInput(currentInput, config)) return;
+
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+  }
+
+  debounceTimer = window.setTimeout(() => {
+    if (!currentInput || !config) return;
+    if (isComposing) return;
+
+    const { prefix, suffixContext } = getPrefixSuffixAtCaret(currentInput);
+    if (prefix.trim().length < config.minTriggerChars) {
+      clearSuggestion();
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastFailureAt < 3000) {
+      return;
+    }
+
+    const requestId = crypto.randomUUID();
+    latestRequestId = requestId;
+
+    const message: SuggestionRequestMessage = {
+      type: "TABHERE_REQUEST_SUGGESTION",
+      requestId,
+      prefix,
+      suffixContext,
+      url: config.sendUrl ? location.href : undefined,
+      title: config.sendTitle ? document.title : undefined,
+      maxOutputTokens: config.maxOutputTokens
+    };
+
+    chrome.runtime.sendMessage(message, (res: SuggestionResponseMessage) => {
+      if (!res || res.error || res.requestId !== latestRequestId) {
+        lastFailureAt = Date.now();
+        clearSuggestion();
+        return;
+      }
+      currentSuggestionSuffix = res.suffix || "";
+      overlay.update(currentInput, currentSuggestionSuffix);
+    });
+  }, config.debounceMs);
+}
+
+document.addEventListener(
+  "focusin",
+  (event) => {
+    const target = getEventTarget(event);
+    if (!target || !config) return;
+    if (isEditableElement(target) && isSiteAllowed(config) && !isSensitiveInput(target, config)) {
+      currentInput = target;
+      clearSuggestion();
+      scheduleSuggest();
+    } else {
+      currentInput = null;
+      clearSuggestion();
+    }
+  },
+  true
+);
+
+document.addEventListener(
+  "focusout",
+  () => {
+    currentInput = null;
+    clearSuggestion();
+  },
+  true
+);
+
+document.addEventListener(
+  "input",
+  (event) => {
+    const target = getEventTarget(event);
+    if (!target || target !== currentInput) return;
+    clearSuggestion();
+    scheduleSuggest();
+  },
+  true
+);
+
+document.addEventListener(
+  "compositionstart",
+  () => {
+    isComposing = true;
+  },
+  true
+);
+
+document.addEventListener(
+  "compositionend",
+  () => {
+    isComposing = false;
+    scheduleSuggest();
+  },
+  true
+);
+
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (!currentInput || !config) return;
+    if (!currentSuggestionSuffix) return;
+
+    const shortcutMatches =
+      (config.shortcutKey === "Tab" && event.key === "Tab" && !event.ctrlKey && !event.metaKey) ||
+      (config.shortcutKey === "CtrlSpace" && event.key === " " && event.ctrlKey);
+
+    if (shortcutMatches) {
+      event.preventDefault();
+      applySuggestion(currentInput, currentSuggestionSuffix);
+      clearSuggestion();
+    } else if (event.key === "Escape") {
+      clearSuggestion();
+    }
+  },
+  true
+);
+
+window.addEventListener(
+  "scroll",
+  () => {
+    if (currentInput && currentSuggestionSuffix) {
+      overlay.update(currentInput, currentSuggestionSuffix);
+    }
+  },
+  true
+);
+
+window.addEventListener("resize", () => {
+  if (currentInput && currentSuggestionSuffix) {
+    overlay.update(currentInput, currentSuggestionSuffix);
+  }
+});
+
