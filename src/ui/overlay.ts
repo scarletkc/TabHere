@@ -17,29 +17,33 @@ export class SuggestionOverlay {
   }
 
   public update(target: HTMLElement | null, suffix: string) {
-    if (!target || !suffix) {
+    try {
+      if (!target || !suffix) {
+        this.hide();
+        return;
+      }
+
+      const caretRect = getCaretRect(target);
+      if (!caretRect) {
+        this.hide();
+        return;
+      }
+
+      const computed = window.getComputedStyle(target);
+      this.overlay.style.fontFamily = computed.fontFamily;
+      this.overlay.style.fontSize = computed.fontSize;
+      this.overlay.style.fontWeight = computed.fontWeight;
+      this.overlay.style.lineHeight = computed.lineHeight;
+      this.overlay.style.letterSpacing = computed.letterSpacing;
+      this.overlay.style.textAlign = computed.textAlign;
+
+      this.overlay.textContent = suffix;
+      this.overlay.style.left = `${caretRect.left}px`;
+      this.overlay.style.top = `${caretRect.top}px`;
+      this.overlay.style.visibility = "visible";
+    } catch {
       this.hide();
-      return;
     }
-
-    const caretRect = getCaretRect(target);
-    if (!caretRect) {
-      this.hide();
-      return;
-    }
-
-    const computed = window.getComputedStyle(target);
-    this.overlay.style.fontFamily = computed.fontFamily;
-    this.overlay.style.fontSize = computed.fontSize;
-    this.overlay.style.fontWeight = computed.fontWeight;
-    this.overlay.style.lineHeight = computed.lineHeight;
-    this.overlay.style.letterSpacing = computed.letterSpacing;
-    this.overlay.style.textAlign = computed.textAlign;
-
-    this.overlay.textContent = suffix;
-    this.overlay.style.left = `${caretRect.left}px`;
-    this.overlay.style.top = `${caretRect.top}px`;
-    this.overlay.style.visibility = "visible";
   }
 
   public hide() {
@@ -119,7 +123,6 @@ function getTextInputCaretRect(
   ] as const;
 
   for (const prop of propsToCopy) {
-    // @ts-expect-error dynamic style copy
     mirror.style[prop] = computed[prop];
   }
 

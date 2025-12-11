@@ -15,10 +15,14 @@ let lastFailureAt = 0;
 
 const overlay = new SuggestionOverlay();
 
-function getRuntime(): chrome.runtime.Runtime | null {
+type RuntimeLike = {
+  sendMessage: typeof chrome.runtime.sendMessage;
+};
+
+function getRuntime(): RuntimeLike | null {
   const anyGlobal = globalThis as any;
   const runtime = (anyGlobal.chrome && anyGlobal.chrome.runtime) || (anyGlobal.browser && anyGlobal.browser.runtime);
-  return runtime && typeof runtime.sendMessage === "function" ? (runtime as chrome.runtime.Runtime) : null;
+  return runtime && typeof runtime.sendMessage === "function" ? (runtime as RuntimeLike) : null;
 }
 
 async function refreshConfig() {
@@ -223,10 +227,23 @@ function applySuggestion(el: HTMLElement, suffix: string) {
   const end = input.selectionEnd ?? start;
   const value = input.value || "";
   const nextValue = value.slice(0, start) + suffix + value.slice(end);
-  input.value = nextValue;
+  setNativeValue(input, nextValue);
   const caret = start + suffix.length;
   input.setSelectionRange(caret, caret);
   input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function setNativeValue(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  let proto: any = input;
+  while (proto) {
+    const descriptor = Object.getOwnPropertyDescriptor(proto, "value");
+    if (descriptor?.set) {
+      descriptor.set.call(input, value);
+      return;
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+  input.value = value;
 }
 
 function clearSuggestion() {
@@ -349,9 +366,14 @@ document.addEventListener(
     if (!currentInput || !config) return;
     if (!currentSuggestionSuffix) return;
 
-    const shortcutMatches =
-      (config.shortcutKey === "Tab" && event.key === "Tab" && !event.ctrlKey && !event.metaKey) ||
-      (config.shortcutKey === "CtrlSpace" && event.key === " " && event.ctrlKey);
+    const isTabShortcut =
+      config.shortcutKey === "Tab" && event.key === "Tab" && !event.ctrlKey && !event.metaKey;
+    const isCtrlSpaceShortcut =
+      config.shortcutKey === "CtrlSpace" &&
+      event.ctrlKey &&
+      (event.code === "Space" || event.key === " " || event.key === "Spacebar" || event.key === "Space");
+
+    const shortcutMatches = isTabShortcut || isCtrlSpaceShortcut;
 
     if (shortcutMatches) {
       event.preventDefault();
