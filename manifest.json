@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "__MSG_extDesc__",
   "author": "ScarletKc",
   "homepage_url": "https://github.com/scarletkc/TabHere",
@@ -13,9 +13,15 @@
   "icons": {
     "128": "public/icon-128.png"
   },
-  "permissions": ["storage"],
-  "host_permissions": ["https://api.openai.com/*"],
-  "optional_host_permissions": ["*://*/v1/*"],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://api.openai.com/*"
+  ],
+  "optional_host_permissions": [
+    "*://*/v1/*"
+  ],
   "background": {
     "service_worker": "dist/background.js",
     "type": "module"
@@ -23,8 +29,12 @@
   "options_page": "dist/options/options.html",
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["dist/content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "dist/content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     }
