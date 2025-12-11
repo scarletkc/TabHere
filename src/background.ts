@@ -10,6 +10,10 @@ type ClientCache = {
 
 const clientCache: ClientCache = {};
 
+chrome.action.onClicked.addListener(() => {
+  chrome.runtime.openOptionsPage();
+});
+
 async function createOpenAIClient(): Promise<OpenAI> {
   const { apiKey, baseUrl } = await getConfig();
   if (!apiKey) {
