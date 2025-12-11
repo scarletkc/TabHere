@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TabHere - AI Autocomplete",
   "version": "0.2.0",
-  "description": "在任意网页输入框中使用 OpenAI 进行 Tab 自动补全。",
+  "description": "在任意网页输入框中使用 AI 进行 Tab 自动补全。",
   "icons": {
     "128": "public/icon-128.png"
   },
