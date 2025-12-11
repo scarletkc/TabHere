@@ -66,6 +66,18 @@
         font-size: 12px;
         margin-top: 2px;
       }
+      .footer {
+        margin-top: 16px;
+        font-size: 12px;
+        color: #666;
+      }
+      .footer a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .footer a:hover {
+        text-decoration: underline;
+      }
     </style>
   </head>
   <body>
@@ -149,6 +161,17 @@
 
     <button id="save" type="button" data-i18n="saveButtonLabel">Save</button>
     <span id="status"></span>
+
+    <div class="footer">
+      <a
+        href="https://github.com/scarletkc/TabHere"
+        target="_blank"
+        rel="noopener noreferrer"
+        data-i18n="openSourceLink"
+        >Open-source on GitHub</a
+      >
+      <div id="version"></div>
+    </div>
 
     <script type="module" src="./options.ts"></script>
   </body>

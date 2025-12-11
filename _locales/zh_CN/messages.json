@@ -42,6 +42,8 @@
 
   "saveButtonLabel": { "message": "保存设置" },
   "statusSaved": { "message": "已保存" },
+  "openSourceLink": { "message": "在 GitHub 以 MIT 许可证开源" },
+  "versionPrefix": { "message": "版本" },
 
   "errorApiKeyEmpty": { "message": "请填写 OpenAI API Key" },
   "confirmApiKeyInvalid": {

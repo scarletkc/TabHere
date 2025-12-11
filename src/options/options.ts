@@ -44,6 +44,12 @@ const enabledSitesTextarea = document.getElementById("enabledSites") as HTMLText
 const disabledSitesTextarea = document.getElementById("disabledSites") as HTMLTextAreaElement;
 const saveBtn = document.getElementById("save") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLSpanElement;
+const versionEl = document.getElementById("version") as HTMLDivElement | null;
+
+if (versionEl) {
+  const manifest = chrome.runtime.getManifest();
+  versionEl.textContent = `${t("versionPrefix")}: ${manifest.version}`;
+}
 
 function setStatus(message: string, isError = false) {
   statusEl.textContent = message;
