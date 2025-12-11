@@ -222,7 +222,7 @@ async function main() {
     }
   }
 
-  for (const extra of ["LICENSE", "README.md"]) {
+  for (const extra of ["LICENSE"]) {
     const p = resolve(rootDir, extra);
     if (existsSync(p)) files.push(p);
   }
