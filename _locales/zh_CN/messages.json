@@ -1,5 +1,5 @@
 {
-  "extName": { "message": "TabHere - AI 自动补全" },
+  "extName": { "message": "TabHere" },
   "extDesc": { "message": "在任意输入框中使用 AI 自动补全。" },
 
   "optPageTitle": { "message": "TabHere 设置" },
