@@ -1,0 +1,62 @@
+{
+  "extName": { "message": "TabHere - AI 自动补全" },
+  "extDesc": { "message": "在任意输入框中使用 AI 自动补全。" },
+
+  "optPageTitle": { "message": "TabHere 设置" },
+  "optHeading": { "message": "TabHere 设置" },
+
+  "apiKeyLabel": { "message": "OpenAI API Key" },
+  "apiKeyPlaceholder": { "message": "sk-..." },
+  "apiKeyHint": { "message": "Key 仅保存在本地浏览器存储中。" },
+
+  "baseUrlLabel": { "message": "Base URL" },
+  "baseUrlPlaceholder": { "message": "https://api.openai.com/v1" },
+
+  "modelLabel": { "message": "模型 ID" },
+  "modelPlaceholder": { "message": "gpt-5.2-mini" },
+
+  "maxTokensLabel": { "message": "最大补全长度（tokens）" },
+  "temperatureLabel": { "message": "温度（temperature）" },
+
+  "debounceLabel": { "message": "补全触发延迟（ms）" },
+  "minTriggerLabel": { "message": "最低触发字数" },
+
+  "shortcutLabel": { "message": "快捷键" },
+  "shortcutTabOption": { "message": "Tab" },
+  "shortcutCtrlSpaceOption": { "message": "Ctrl + Space" },
+
+  "sendUrlLabel": { "message": "发送 URL 作为上下文" },
+  "sendTitleLabel": { "message": "发送页面标题作为上下文" },
+  "useSyncLabel": { "message": "同步设置与 API Key（chrome.storage.sync）" },
+  "disableSensitiveLabel": { "message": "在敏感输入框禁用（如密码/验证码）" },
+
+  "enabledSitesLabel": {
+    "message": "站点白名单（逗号或换行分隔，留空表示全站启用）"
+  },
+  "enabledSitesPlaceholder": { "message": "example.com" },
+
+  "disabledSitesLabel": {
+    "message": "站点黑名单（逗号或换行分隔）"
+  },
+  "disabledSitesPlaceholder": {
+    "message": "bank.com, mail.example.com"
+  },
+
+  "saveButtonLabel": { "message": "保存设置" },
+  "statusSaved": { "message": "已保存" },
+
+  "errorApiKeyEmpty": { "message": "请填写 OpenAI API Key" },
+  "confirmApiKeyInvalid": {
+    "message": "API Key 看起来不正确（应以 sk- 开头）。仍然保存吗？"
+  },
+  "errorBaseUrlInvalid": { "message": "Base URL 无效" },
+  "errorMaxTokensInvalid": { "message": "最大补全长度需为正数" },
+  "errorTemperatureInvalid": { "message": "温度需在 0~2 之间" },
+  "errorDebounceInvalid": { "message": "补全触发延迟需为非负数" },
+  "errorMinTriggerInvalid": { "message": "最低触发字数需为非负数" },
+  "warningOptionalPermissionDenied": {
+    "message": "未授权自定义 Base URL 的访问权限，可能导致请求失败。"
+  },
+  "errorSaveFailed": { "message": "保存失败，请查看控制台" }
+}
+

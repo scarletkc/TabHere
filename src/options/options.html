@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TabHere 设置</title>
+    <title data-i18n="optPageTitle">TabHere Settings</title>
     <style>
       body {
         font-family: system-ui, sans-serif;
@@ -69,35 +69,35 @@
     </style>
   </head>
   <body>
-    <h1>TabHere 设置</h1>
+    <h1 data-i18n="optHeading">TabHere Settings</h1>
 
     <div class="section">
       <label>
-        OpenAI API Key
-        <input id="apiKey" type="password" placeholder="sk-..." />
-        <div class="hint">Key 仅保存在本地浏览器存储中。</div>
+        <span data-i18n="apiKeyLabel">OpenAI API Key</span>
+        <input id="apiKey" type="password" data-i18n-placeholder="apiKeyPlaceholder" />
+        <div class="hint" data-i18n="apiKeyHint">Your key is stored locally in browser storage.</div>
       </label>
 
       <div class="row">
         <label>
-          Base URL
-          <input id="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
+          <span data-i18n="baseUrlLabel">Base URL</span>
+          <input id="baseUrl" type="text" data-i18n-placeholder="baseUrlPlaceholder" />
         </label>
 
         <label>
-          模型 ID
-          <input id="model" type="text" placeholder="gpt-5.2-mini" />
+          <span data-i18n="modelLabel">Model ID</span>
+          <input id="model" type="text" data-i18n-placeholder="modelPlaceholder" />
         </label>
       </div>
 
       <div class="row">
         <label>
-          最大补全长度（tokens）
+          <span data-i18n="maxTokensLabel">Max completion length (tokens)</span>
           <input id="maxOutputTokens" type="number" min="1" max="512" />
         </label>
 
         <label>
-          温度（temperature）
+          <span data-i18n="temperatureLabel">Temperature</span>
           <input id="temperature" type="number" min="0" max="2" step="0.1" />
         </label>
       </div>
@@ -106,21 +106,21 @@
     <div class="section">
       <div class="row">
         <label>
-          补全触发延迟（ms）
+          <span data-i18n="debounceLabel">Trigger delay (ms)</span>
           <input id="debounceMs" type="number" min="0" step="50" />
         </label>
 
         <label>
-          最低触发字数
+          <span data-i18n="minTriggerLabel">Minimum trigger characters</span>
           <input id="minTriggerChars" type="number" min="0" step="1" />
         </label>
       </div>
 
       <label>
-        快捷键
+        <span data-i18n="shortcutLabel">Shortcut</span>
         <select id="shortcutKey">
-          <option value="Tab">Tab</option>
-          <option value="CtrlSpace">Ctrl + Space</option>
+          <option value="Tab" data-i18n="shortcutTabOption">Tab</option>
+          <option value="CtrlSpace" data-i18n="shortcutCtrlSpaceOption">Ctrl + Space</option>
         </select>
       </label>
     </div>
@@ -128,37 +128,36 @@
     <div class="section">
       <label class="checkbox">
         <input id="sendUrl" type="checkbox" />
-        发送 URL 作为上下文
+        <span data-i18n="sendUrlLabel">Send page URL as context</span>
       </label>
       <label class="checkbox">
         <input id="sendTitle" type="checkbox" />
-        发送页面标题作为上下文
+        <span data-i18n="sendTitleLabel">Send page title as context</span>
       </label>
       <label class="checkbox">
         <input id="useSync" type="checkbox" />
-        同步设置与 API Key（chrome.storage.sync）
+        <span data-i18n="useSyncLabel">Sync settings &amp; API key (chrome.storage.sync)</span>
       </label>
       <label class="checkbox">
         <input id="disableOnSensitive" type="checkbox" />
-        在敏感输入框禁用（如密码/验证码）
+        <span data-i18n="disableSensitiveLabel">Disable on sensitive inputs</span>
       </label>
     </div>
 
     <div class="section">
       <label>
-        站点白名单（逗号或换行分隔，留空表示全站启用）
-        <textarea id="enabledSites" placeholder="example.com"></textarea>
+        <span data-i18n="enabledSitesLabel">Allowed sites</span>
+        <textarea id="enabledSites" data-i18n-placeholder="enabledSitesPlaceholder"></textarea>
       </label>
       <label>
-        站点黑名单（逗号或换行分隔）
-        <textarea id="disabledSites" placeholder="bank.com, mail.example.com"></textarea>
+        <span data-i18n="disabledSitesLabel">Blocked sites</span>
+        <textarea id="disabledSites" data-i18n-placeholder="disabledSitesPlaceholder"></textarea>
       </label>
     </div>
 
-    <button id="save" type="button">保存设置</button>
+    <button id="save" type="button" data-i18n="saveButtonLabel">Save</button>
     <span id="status"></span>
 
     <script type="module" src="./options.ts"></script>
   </body>
 </html>
-

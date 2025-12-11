@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "TabHere - AI Autocomplete",
+  "name": "__MSG_extName__",
   "version": "0.2.0",
-  "description": "在任意网页输入框中使用 AI 进行 Tab 自动补全。",
+  "description": "__MSG_extDesc__",
   "author": "ScarletKc",
   "homepage_url": "https://github.com/scarletkc/TabHere",
   "minimum_chrome_version": "114",
+  "default_locale": "en",
   "icons": {
     "128": "public/icon-128.png"
   },
