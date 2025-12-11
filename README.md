@@ -1,6 +1,6 @@
 # TabHere
 
-TabHere 是一个 Chrome 扩展，为网页中几乎所有可编辑区域提供 AI 自动续写补全：
+TabHere 是一个 Chrome 扩展，为网页中几乎所有可编辑区域提供 AI 自动续写补全功能。
 
 ## 开发
 
