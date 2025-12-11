@@ -9,11 +9,25 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, "..");
 
 function runBuild() {
-  const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
-  const result = spawnSync(npmCmd, ["run", "build"], {
+  console.log("Running build...");
+  let command = "npm";
+  let args = ["run", "build"];
+  let options = {
     cwd: rootDir,
     stdio: "inherit"
-  });
+  };
+
+  if (process.platform === "win32") {
+    // Spawn .cmd safely on Windows by going through cmd.exe.
+    command = "cmd.exe";
+    args = ["/c", "npm", "run", "build"];
+  }
+
+  const result = spawnSync(command, args, options);
+  if (result.error) {
+    console.error(`Failed to run build (${command} ${args.join(" ")}):`, result.error);
+    process.exit(1);
+  }
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
@@ -183,7 +197,11 @@ async function createZip(entries, outPath) {
 }
 
 async function main() {
-  runBuild();
+  if (process.env.SKIP_BUILD !== "1") {
+    runBuild();
+  } else {
+    console.log("SKIP_BUILD=1, using existing dist/");
+  }
 
   const manifestPath = resolve(rootDir, "manifest.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -223,6 +241,7 @@ async function main() {
   await mkdir(outDir, { recursive: true });
   const zipPath = resolve(outDir, `tabhere-${version}.zip`);
 
+  console.log(`Packaging ${entries.length} files...`);
   await createZip(entries, zipPath);
   console.log(`Packaged: ${zipPath}`);
 }
@@ -231,4 +250,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-
