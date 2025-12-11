@@ -13,3 +13,7 @@ npm run version:set -- x.y.z  # 设置版本号
 ```
 
 在 `chrome://extensions/` → 开发者模式 → “加载已解压的扩展程序”，选择项目根目录。
+
+## 链接
+[更多文档](https://github.com/scarletkc/TabHere/tree/main/docs)
+[许可证](https://github.com/scarletkc/TabHere/tree/main/LICENSE)
