@@ -1,5 +1,4 @@
 import { SuggestionOverlay } from "./ui/overlay";
-import { getConfig } from "./shared/config";
 import type {
   SuggestionRequestMessage,
   SuggestionResponseMessage,
@@ -17,13 +16,97 @@ let lastFailureAt = 0;
 const overlay = new SuggestionOverlay();
 
 async function refreshConfig() {
-  config = await getConfig();
+  config = await getConfigLocal();
 }
 
 refreshConfig().catch(console.error);
 chrome.storage.onChanged.addListener(() => {
   refreshConfig().catch(console.error);
 });
+
+const DEFAULT_CONFIG: TabHereConfig = {
+  apiKey: undefined,
+  model: "gpt-5.2-mini",
+  baseUrl: "https://api.openai.com/v1",
+  maxOutputTokens: 64,
+  temperature: 0.2,
+  debounceMs: 500,
+  minTriggerChars: 3,
+  shortcutKey: "Tab",
+  sendUrl: false,
+  sendTitle: false,
+  useSync: true,
+  disabledSites: [],
+  enabledSites: [],
+  disableOnSensitive: true
+};
+
+const CONFIG_KEYS = [
+  "tabhere_api_key",
+  "tabhere_model",
+  "tabhere_base_url",
+  "tabhere_max_output_tokens",
+  "tabhere_temperature",
+  "tabhere_debounce_ms",
+  "tabhere_min_trigger_chars",
+  "tabhere_shortcut_key",
+  "tabhere_send_url",
+  "tabhere_send_title",
+  "tabhere_use_sync",
+  "tabhere_disabled_sites",
+  "tabhere_enabled_sites",
+  "tabhere_disable_on_sensitive"
+] as const;
+
+type ConfigStorageShape = {
+  tabhere_api_key?: string;
+  tabhere_model?: string;
+  tabhere_base_url?: string;
+  tabhere_max_output_tokens?: number;
+  tabhere_temperature?: number;
+  tabhere_debounce_ms?: number;
+  tabhere_min_trigger_chars?: number;
+  tabhere_shortcut_key?: TabHereConfig["shortcutKey"];
+  tabhere_send_url?: boolean;
+  tabhere_send_title?: boolean;
+  tabhere_use_sync?: boolean;
+  tabhere_disabled_sites?: string[];
+  tabhere_enabled_sites?: string[];
+  tabhere_disable_on_sensitive?: boolean;
+};
+
+function storageGet<T>(area: chrome.storage.StorageArea, keys: readonly string[]): Promise<T> {
+  return new Promise((resolve) => {
+    area.get(keys as any, (res) => resolve(res as T));
+  });
+}
+
+async function getConfigLocal(): Promise<TabHereConfig> {
+  const useSyncRes = await storageGet<Pick<ConfigStorageShape, "tabhere_use_sync">>(
+    chrome.storage.sync,
+    ["tabhere_use_sync"]
+  );
+  const useSync = useSyncRes.tabhere_use_sync ?? DEFAULT_CONFIG.useSync;
+  const storage = useSync ? chrome.storage.sync : chrome.storage.local;
+  const res = await storageGet<ConfigStorageShape>(storage, CONFIG_KEYS);
+
+  return {
+    apiKey: res.tabhere_api_key,
+    model: res.tabhere_model || DEFAULT_CONFIG.model,
+    baseUrl: res.tabhere_base_url || DEFAULT_CONFIG.baseUrl,
+    maxOutputTokens: res.tabhere_max_output_tokens ?? DEFAULT_CONFIG.maxOutputTokens,
+    temperature: res.tabhere_temperature ?? DEFAULT_CONFIG.temperature,
+    debounceMs: res.tabhere_debounce_ms ?? DEFAULT_CONFIG.debounceMs,
+    minTriggerChars: res.tabhere_min_trigger_chars ?? DEFAULT_CONFIG.minTriggerChars,
+    shortcutKey: res.tabhere_shortcut_key || DEFAULT_CONFIG.shortcutKey,
+    sendUrl: res.tabhere_send_url ?? DEFAULT_CONFIG.sendUrl,
+    sendTitle: res.tabhere_send_title ?? DEFAULT_CONFIG.sendTitle,
+    useSync,
+    disabledSites: res.tabhere_disabled_sites ?? DEFAULT_CONFIG.disabledSites,
+    enabledSites: res.tabhere_enabled_sites ?? DEFAULT_CONFIG.enabledSites,
+    disableOnSensitive: res.tabhere_disable_on_sensitive ?? DEFAULT_CONFIG.disableOnSensitive
+  };
+}
 
 function getEventTarget(event: Event): HTMLElement | null {
   const path = (event as any).composedPath?.() as EventTarget[] | undefined;
@@ -284,4 +367,3 @@ window.addEventListener("resize", () => {
     overlay.update(currentInput, currentSuggestionSuffix);
   }
 });
-

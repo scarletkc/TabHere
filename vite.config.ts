@@ -2,9 +2,10 @@ import { defineConfig } from "vite";
 import { resolve } from "node:path";
 
 export default defineConfig({
-  publicDir: "public",
+  root: "src",
+  publicDir: "../public",
   build: {
-    outDir: "dist",
+    outDir: "../dist",
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
@@ -31,4 +32,3 @@ export default defineConfig({
     }
   }
 });
-
