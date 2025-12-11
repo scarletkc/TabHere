@@ -16,4 +16,5 @@ npm run version:set -- x.y.z  # 设置版本号
 
 ## 链接
 [更多文档](https://github.com/scarletkc/TabHere/tree/main/docs)
-[许可证](https://github.com/scarletkc/TabHere/tree/main/LICENSE)
+
+[MIT 许可证](https://github.com/scarletkc/TabHere/tree/main/LICENSE)
