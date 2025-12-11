@@ -1,8 +1,9 @@
 # TabHere 技术设计文档
 
-> 版本：v0.1
+> 版本：v0.2（技术方案优化稿）
 > 插件名：**TabHere**
 > 功能：在网页任意输入框中提供 AI 自动补全（Tab 接受，类似 IDE 补全）
+> 适用范围：Chrome 扩展（Manifest V3）
 
 ---
 
@@ -18,13 +19,22 @@ TabHere 是一个 Chrome 扩展，提供「全局 AI 输入补全」能力：
 * 用户按下 **Tab** 接受补全，将建议合并到真实输入框里
 * **多语言适配**：根据输入语言自动生成匹配语言的补全
 
+非目标与边界（v0.1/v0.2）：
+
+* 不支持密码框、信用卡/安全码等敏感输入框（默认禁用 `type=password` 等）。
+* 不保证对所有富文本/虚拟 DOM 编辑器 100% 兼容（见兼容性章节），以“尽可能覆盖常见输入场景”为目标。
+* 不对用户输入做云端存储与分析；仅用于实时补全。
+
 ### 1.2 技术关键点
 
 * **Manifest V3** Chrome 扩展
 * 使用 **content script + background service worker** 架构
 * 使用官方 **JavaScript/TypeScript OpenAI SDK**，调用 **Responses API** 生成文本补全
-* 用户在扩展的设置（options page）中填写自己的 **OpenAI API Key**，保存在浏览器本地 `chrome.storage` 中
+* 用户在扩展设置（options page）中填写自己的 **OpenAI API Key**，保存在浏览器本地 `chrome.storage`（默认 `sync`，可选 `local`）
 * 默认推荐模型：`gpt-5.2-mini`（价格低、速度快，适合大量小补全任务）
+* **后缀式补全**：模型只返回“补全后缀”，避免改写前缀带来的错配
+* **防抖 + 取消/乱序保护**：对输入请求做防抖、对旧请求 `abort` 或丢弃，保证 UI 一致性
+* **可配置快捷键与站点开关**：降低 Tab 冲突与隐私风险
 
 ---
 
@@ -54,9 +64,12 @@ TabHere 是一个 Chrome 扩展，提供「全局 AI 输入补全」能力：
    * 用户输入 / 修改：
 
      * OpenAI API Key
+     * BaseURL / Endpoint（可选，默认 `https://api.openai.com/v1`）
      * 模型 ID（默认 `gpt-5.2-mini`）
-     * 补全触发延迟、最大补全长度等参数
-   * 使用 `chrome.storage.sync` 持久化这些配置
+     * 补全触发延迟、最大补全长度、最低触发字数等参数
+     * 快捷键（默认 Tab，可切换 `Ctrl+Space` 等）
+     * 站点黑白名单、是否发送 URL/标题、是否同步 Key 等隐私选项
+   * 使用 `chrome.storage.sync`（或按用户选择 `local`）持久化这些配置
 
 4. **UI Overlay 模块（content 内部子模块）**
 
@@ -70,25 +83,27 @@ TabHere 是一个 Chrome 扩展，提供「全局 AI 输入补全」能力：
 
 2. `content script` 监听到 `input` 事件，启动防抖计时器（例如 500ms）
 
-3. 防抖结束后，`content script` 向 `background` 发送 `REQUEST_SUGGESTION` 消息，携带：
+3. 防抖结束后，`content script` 为本次输入生成 `requestId`，并取消上一轮未完成请求（`AbortController` 或逻辑丢弃），然后向 `background` 发送 `TABHERE_REQUEST_SUGGESTION` 消息，携带：
 
    * 当前输入文本
-   * 光标位置（可选）
-   * 页面标题 / URL / 额外上下文（可选）
+   * 光标位置 / 选区信息（可选）
+   * 输入语言/方向（可选）
+   * 页面标题 / URL / 额外上下文（可选，受隐私开关控制）
+   * requestId
 
 4. `background`：
 
    * 从 `chrome.storage` 获取 API Key 和设置
    * 构造 prompt，调用 OpenAI SDK 的 `client.responses.create`
-   * 得到完整补全文本，将其通过 `sendResponse` 返回
+   * 得到补全后缀（suffix），将其连同 requestId 通过 `sendResponse` 返回
 
 5. `content script`：
 
-   * 接收返回的建议，将其缓存为 `currentSuggestion`
-   * 刷新 overlay，在输入框后方显示灰色的「剩余部分」
+   * 只接受最新 requestId 的返回，将 suffix 缓存为 `currentSuggestionSuffix`
+   * 刷新 overlay，在光标后方显示灰色的「补全后缀」
    * 用户按下 **Tab**：
 
-     * 将 `currentSuggestion` 写回输入框
+     * 将 `currentSuggestionSuffix` 追加写回输入框/光标位置
      * 清空 overlay
 
 ---
@@ -129,12 +144,13 @@ tabhere/
     "128": "public/icon-128.png"
   },
   "permissions": [
-    "storage",
-    "scripting",
-    "activeTab"
+    "storage"
   ],
   "host_permissions": [
     "https://api.openai.com/*"
+  ],
+  "optional_host_permissions": [
+    "*://*/v1/*"
   ],
   "background": {
     "service_worker": "dist/background.js",
@@ -153,7 +169,8 @@ tabhere/
 
 说明：
 
-* `host_permissions` 只需要 `https://api.openai.com/*` 即可调用 OpenAI API
+* `permissions` 最小化为 `storage`；若未来采用运行时动态注入，可再加入 `scripting` / `activeTab`
+* `host_permissions` 仅允许默认 OpenAI 域名；若用户启用自定义 BaseURL，则通过 `optional_host_permissions` 动态申请
 * `background.type = "module"` 允许使用 ESM + 顶层 `await`
 * 所有源码通过构建工具打包到 `dist`，manifest 指向打包后的文件
 
@@ -168,31 +185,39 @@ tabhere/
   * `<input type="text|search|email|url|tel">`
   * `<textarea>`
   * 任意 `contenteditable=true` 元素
+  * 默认忽略 `type=password`、`autocomplete=one-time-code` 等高敏输入
 * 监听事件：
 
   * `focusin / focusout`：维护当前活跃输入框引用
   * `input`：用户输入内容
+  * `compositionstart / compositionend`：兼容 IME 合成输入（合成中不触发补全）
   * `keydown`：
 
     * Tab 接受补全
     * ESC 取消补全
 * 向后台发送补全请求，并接收建议
 * 控制 overlay 的渲染与销毁
+* 对 iframe / shadow DOM 中的可编辑区域做尽力支持（监听捕获阶段 + 递归扫描）
 
 ### 5.2 核心数据结构
 
 ```ts
 interface TabHereSuggestionRequest {
   type: "TABHERE_REQUEST_SUGGESTION";
-  text: string;
-  url: string;
-  title: string;
-  maxTokens?: number;
+  requestId: string;
+  prefix: string;           // 光标前文本（必传）
+  suffixContext?: string;   // 光标后文本（可选）
+  cursorOffset?: number;    // 光标在 prefix 内的位置（可选）
+  languageHint?: string;    // 例如 "zh" / "en"（可选）
+  url?: string;
+  title?: string;
+  maxOutputTokens?: number;
 }
 
 interface TabHereSuggestionResponse {
   type: "TABHERE_SUGGESTION";
-  suggestion: string; // 完整结果（包含原文本 + 补全）
+  requestId: string;
+  suffix: string; // 仅补全后缀
   error?: string;
 }
 ```
@@ -201,7 +226,10 @@ interface TabHereSuggestionResponse {
 
 ```ts
 let currentInput: HTMLInputElement | HTMLTextAreaElement | HTMLElement | null = null;
-let currentSuggestion = "";
+let currentSuggestionSuffix = "";
+let latestRequestId: string | null = null;
+let abortController: AbortController | null = null;
+let isComposing = false;
 
 // 创建 overlay 节点
 const suggestionOverlay = document.createElement("div");
@@ -221,33 +249,41 @@ function setInputText(el: HTMLElement, text: string) {
 }
 
 function updateOverlayPosition() {
-  if (!currentInput || !currentSuggestion) {
+  if (!currentInput || !currentSuggestionSuffix) {
     suggestionOverlay.style.visibility = "hidden";
     return;
   }
-  const rect = currentInput.getBoundingClientRect();
-  // 简化版：overlay 放在输入框左上角，字体与输入框同步
-  // 实际可根据光标位置进一步计算
+  // v0.2：基于 caret 位置渲染（textarea 镜像 / Range.getClientRects）
+  // 并复制输入框的 font/line-height/letter-spacing/padding/transform
 }
 
 function scheduleSuggest() {
   // 使用 setTimeout 做 500ms 防抖
   // 在计时结束时：
-  const text = getInputText(currentInput!);
+  if (isComposing) return;
+  const prefix = getInputText(currentInput!);
+  if (prefix.trim().length < minTriggerChars) return;
+  const requestId = crypto.randomUUID();
+  latestRequestId = requestId;
+  abortController?.abort();
+  abortController = new AbortController();
+
   chrome.runtime.sendMessage<TabHereSuggestionRequest>(
     {
       type: "TABHERE_REQUEST_SUGGESTION",
-      text,
-      url: location.href,
-      title: document.title
+      requestId,
+      prefix,
+      url: privacySendUrl ? location.href : undefined,
+      title: privacySendTitle ? document.title : undefined,
+      maxOutputTokens
     },
     (res: TabHereSuggestionResponse) => {
-      if (!res || res.error) {
-        currentSuggestion = "";
+      if (!res || res.error || res.requestId !== latestRequestId) {
+        currentSuggestionSuffix = "";
         updateOverlayPosition();
         return;
       }
-      currentSuggestion = res.suggestion;
+      currentSuggestionSuffix = res.suffix;
       updateOverlayPosition();
     }
   );
@@ -256,22 +292,20 @@ function scheduleSuggest() {
 // keydown: Tab 接受补全
 document.addEventListener("keydown", (e) => {
   if (!currentInput) return;
-  if (e.key === "Tab" && currentSuggestion) {
+  if (e.key === "Tab" && currentSuggestionSuffix) {
     e.preventDefault();
     const text = getInputText(currentInput);
-    if (currentSuggestion.startsWith(text)) {
-      setInputText(currentInput, currentSuggestion);
-    }
-    currentSuggestion = "";
+    setInputText(currentInput, text + currentSuggestionSuffix);
+    currentSuggestionSuffix = "";
     updateOverlayPosition();
   } else if (e.key === "Escape") {
-    currentSuggestion = "";
+    currentSuggestionSuffix = "";
     updateOverlayPosition();
   }
 });
 ```
 
-> 在后续优化中，可以用 `Range.getClientRects()` 精确计算光标位置，让幽灵文本紧贴光标，而不是简单放在输入框角落。
+> v0.2 起优先采用 caret 定位；简化定位仅作为降级策略。
 
 ---
 
@@ -312,13 +346,28 @@ console.log(response.output_text);
 import OpenAI from "openai";
 
 async function getUserConfig() {
-  return new Promise<{ apiKey?: string; model?: string }>((resolve) => {
+  return new Promise<{
+    apiKey?: string;
+    model?: string;
+    baseURL?: string;
+    maxOutputTokens?: number;
+    temperature?: number;
+  }>((resolve) => {
     chrome.storage.sync.get(
-      ["tabhere_api_key", "tabhere_model"],
+      [
+        "tabhere_api_key",
+        "tabhere_model",
+        "tabhere_base_url",
+        "tabhere_max_output_tokens",
+        "tabhere_temperature"
+      ],
       (res) => {
         resolve({
           apiKey: res.tabhere_api_key,
-          model: res.tabhere_model || "gpt-5.2-mini"
+          model: res.tabhere_model || "gpt-5.2-mini",
+          baseURL: res.tabhere_base_url || "https://api.openai.com/v1",
+          maxOutputTokens: res.tabhere_max_output_tokens,
+          temperature: res.tabhere_temperature
         });
       }
     );
@@ -326,11 +375,12 @@ async function getUserConfig() {
 }
 
 async function createOpenAIClient() {
-  const { apiKey } = await getUserConfig();
+  const { apiKey, baseURL } = await getUserConfig();
   if (!apiKey) throw new Error("NO_API_KEY");
 
   const client = new OpenAI({
     apiKey,
+    baseURL,
     // 声明我们清楚在浏览器环境中使用的风险
     dangerouslyAllowBrowser: true
   });
@@ -344,40 +394,54 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     try {
       const client = await createOpenAIClient();
-      const { text } = message as { text: string };
+      const { requestId, prefix, suffixContext } = message as {
+        requestId: string;
+        prefix: string;
+        suffixContext?: string;
+      };
 
-      if (!text || !text.trim()) {
-        sendResponse({ type: "TABHERE_SUGGESTION", suggestion: "" });
+      if (!prefix || !prefix.trim()) {
+        sendResponse({ type: "TABHERE_SUGGESTION", requestId, suffix: "" });
         return;
       }
 
-      const { model } = await getUserConfig();
+      const { model, maxOutputTokens, temperature } = await getUserConfig();
 
       const resp = await client.responses.create({
         model: model || "gpt-5.2-mini",
+        max_output_tokens: maxOutputTokens || 64,
+        temperature: temperature ?? 0.2,
         input: [
           {
             role: "system",
             content:
-              "你是一个智能输入法，只负责在用户已经输入的文本后继续自然补全，不要重新改写已有内容。"
+              "你是一个智能输入法补全引擎。只输出用户文本的自然续写后缀，不要改写、重复或纠正已有前缀。不要添加解释。"
           },
           {
             role: "user",
-            content: `请在这段文本后继续合理的补全，只返回补全后的完整文本：\n${text}`
+            content: [
+              "给出接在前缀后的补全后缀。",
+              "要求：1) 不改写前缀；2) 不重复前缀；3) 语言/语气与前缀一致；4) 长度适中。",
+              `前缀：${prefix}`,
+              suffixContext ? `后文上下文（可选）：${suffixContext}` : "",
+              "只返回后缀文本："
+            ].filter(Boolean).join("\n")
           }
         ]
       });
 
-      const outputText = resp.output_text || "";
+      const outputText = (resp.output_text || "").trimStart();
       sendResponse({
         type: "TABHERE_SUGGESTION",
-        suggestion: outputText
+        requestId,
+        suffix: outputText
       });
     } catch (e: any) {
       console.error("TabHere OpenAI error", e);
       sendResponse({
         type: "TABHERE_SUGGESTION",
-        suggestion: "",
+        requestId: (message as any)?.requestId || "",
+        suffix: "",
         error: e?.message || "OpenAI error"
       });
     }
@@ -391,7 +455,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 > 说明：
 >
 > * `resp.output_text` 是 Responses API 的辅助 getter，用于直接取出文本内容。
-> * 这里让模型返回「完整文本」（原文本 + 补全），在 content script 里只显示「多出来的部分」。
+> * 这里让模型返回「补全后缀」，content script 仅展示后缀，并在 Tab 时追加到真实输入中。
 
 ---
 
@@ -402,10 +466,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 Options 页面（`options.html`）包含：
 
 * OpenAI API Key 输入框 + 保存按钮
-* 自定义baseURL输入框 Endpoint （可选，默认 `https://api.openai.com/v1`）
+* 自定义 BaseURL 输入框 Endpoint（可选，默认 `https://api.openai.com/v1`）
 * 模型 ID 输入框（默认 `gpt-5.2-mini`）
-* 最大补全长度（可选）
+* 最大补全长度 / max output tokens（可选）
 * 补全触发延迟（ms，可选）
+* 最低触发字数（避免短输入频繁调用）
+* 快捷键设置（默认 Tab；冲突时可改为 `Ctrl+Space` 等）
+* 站点黑白名单（域名级）
+* 隐私开关：是否发送 URL / 标题；是否同步 API Key；是否在敏感输入禁用
 
 ### 7.2 保存与读取
 
@@ -414,14 +482,20 @@ Options 页面（`options.html`）包含：
 ```ts
 // options.ts
 const apiKeyInput = document.getElementById("apiKey") as HTMLInputElement;
+const baseUrlInput = document.getElementById("baseUrl") as HTMLInputElement;
 const modelInput = document.getElementById("model") as HTMLInputElement;
+const maxOutputTokensInput = document.getElementById("maxOutputTokens") as HTMLInputElement;
+const temperatureInput = document.getElementById("temperature") as HTMLInputElement;
 const saveBtn = document.getElementById("save") as HTMLButtonElement;
 
 saveBtn.addEventListener("click", () => {
   chrome.storage.sync.set(
     {
       tabhere_api_key: apiKeyInput.value.trim(),
-      tabhere_model: modelInput.value.trim() || "gpt-5.2-mini"
+      tabhere_base_url: baseUrlInput.value.trim() || "https://api.openai.com/v1",
+      tabhere_model: modelInput.value.trim() || "gpt-5.2-mini",
+      tabhere_max_output_tokens: Number(maxOutputTokensInput.value) || 64,
+      tabhere_temperature: Number(temperatureInput.value) || 0.2
     },
     () => {
       // 提示已保存
@@ -432,15 +506,27 @@ saveBtn.addEventListener("click", () => {
 
 // 初始化时读取
 chrome.storage.sync.get(
-  ["tabhere_api_key", "tabhere_model"],
+  [
+    "tabhere_api_key",
+    "tabhere_base_url",
+    "tabhere_model",
+    "tabhere_max_output_tokens",
+    "tabhere_temperature"
+  ],
   (res) => {
     if (res.tabhere_api_key) apiKeyInput.value = res.tabhere_api_key;
+    baseUrlInput.value = res.tabhere_base_url || "https://api.openai.com/v1";
     modelInput.value = res.tabhere_model || "gpt-5.2-mini";
+    maxOutputTokensInput.value = String(res.tabhere_max_output_tokens || 64);
+    temperatureInput.value = String(res.tabhere_temperature ?? 0.2);
   }
 );
 ```
 
+> 注意：以上示例默认使用 `chrome.storage.sync`。若用户关闭“同步 API Key”，则读写应切换到 `chrome.storage.local`（可通过 `tabhere_use_sync` 标志控制）。
+
 > 推荐使用 `sync` 而不是 `local`，这样用户在用同一账号登录 Chrome，同步扩展时也能自动同步设置。
+> 若用户更关注安全，可在 Options 中选择将 API Key 存于 `local` 并关闭同步。
 
 ---
 
@@ -461,13 +547,34 @@ chrome.storage.sync.get(
 
 3. **数据隐私**
 
-   * TabHere 只会把当前输入内容、页面标题 / URL（可选）发送给 OpenAI 以生成补全
+   * TabHere 只会把当前输入内容发送给 OpenAI 以生成补全
+   * 页面标题 / URL 默认不发送，需用户显式开启
    * 不会上传完整网页内容或其他敏感数据（除非用户输入到了文本框里）
    * 可以在 README / Options 页中加入隐私说明
+   * 上架 Chrome Web Store 需符合“最小权限 + 明确披露数据使用”要求
 
 ---
 
-## 9. 开发、调试与打包流程
+## 9. 性能、成本与兼容性策略
+
+### 9.1 性能与成本
+
+* **防抖与最小触发阈值**：默认 400–600ms 防抖，`minTriggerChars` 默认 3–5。
+* **请求取消/乱序保护**：新输入触发时取消旧请求；仅渲染最新 requestId 的结果。
+* **长度控制**：`max_output_tokens` 默认 32–64，避免长补全带来成本与 UI 侵入。
+* **错误与退避**：连续失败时短暂退避（例如 3s），避免刷 API。
+* **可选缓存**：对同一前缀的短期重复请求做内存级缓存（tab 生命周期内）。
+
+### 9.2 兼容性与降级
+
+* **优先支持**：原生 `input/textarea`、简单 `contenteditable`。
+* **需尽力支持**：shadow DOM/iframe 内输入、常见富文本编辑器（Notion/Slack/Gmail/飞书/语雀等）。
+* **已知高风险**：Google Docs、某些虚拟光标编辑器、Canvas/自绘输入、复杂 IME 叠加场景。
+* **降级策略**：无法精确定位 caret 时，退回到输入框左上角或关闭 overlay；仍允许 Tab 接受。
+
+---
+
+## 10. 开发、调试与打包流程
 
 1. **安装依赖**
 
@@ -498,7 +605,7 @@ chrome.storage.sync.get(
 
 ---
 
-## 10. 后续扩展方向（规划）
+## 11. 后续扩展方向（规划）
 
 * **站点黑白名单**：在 Options 页配置在哪些域名启用 / 禁用 TabHere
 * **更精细的光标跟随**：使用 selection / range 精确计算光标位置
