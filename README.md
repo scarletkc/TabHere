@@ -20,5 +20,6 @@ In `chrome://extensions/` → enable **Developer mode** → **Load unpacked**, t
 
 ## Links
 
+- [Chrome Web Store](https://chromewebstore.google.com/detail/oeokpncnejjfjdbpnchhldjdabhppnlb)
 - [Roadmap](./docs/roadmap.md)
 - [MIT License](./LICENSE)
