@@ -20,5 +20,5 @@ In `chrome://extensions/` → enable **Developer mode** → **Load unpacked**, t
 
 ## Links
 
-- [More docs](./docs)
+- [Roadmap](./docs/roadmap.md)
 - [MIT License](./LICENSE)
