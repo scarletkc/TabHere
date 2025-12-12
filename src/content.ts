@@ -802,10 +802,27 @@ function handleKeyup(event: Event) {
     keyEvent.key === "Backspace" ||
     keyEvent.key === "Delete" ||
     keyEvent.key === "Enter";
-  if (!isEditingKey) return;
+  const isNavigationKey =
+    keyEvent.key === "ArrowLeft" ||
+    keyEvent.key === "ArrowRight" ||
+    keyEvent.key === "ArrowUp" ||
+    keyEvent.key === "ArrowDown" ||
+    keyEvent.key === "Home" ||
+    keyEvent.key === "End" ||
+    keyEvent.key === "PageUp" ||
+    keyEvent.key === "PageDown";
+
+  if (!isEditingKey && !isNavigationKey) return;
 
   currentInput = editable;
   clearSuggestion();
+  if (isEditingKey) {
+    scheduleSuggest();
+    return;
+  }
+
+  const { selectedText } = getSelectionSnapshot(editable);
+  if (selectedText.trim().length === 0) return;
   scheduleSuggest();
 }
 
@@ -819,6 +836,8 @@ function handleSelect(event: Event) {
 
   currentInput = editable;
   clearSuggestion();
+  const { selectedText } = getSelectionSnapshot(editable);
+  if (selectedText.trim().length === 0) return;
   scheduleSuggest();
 }
 
@@ -830,16 +849,27 @@ function handleMouseUp(event: Event) {
   if (!editable) return;
   if (config && (isSensitiveInput(editable, config) || !isSiteAllowed(config))) return;
 
-  const { selectedText } = getSelectionSnapshot(editable);
-  if (!selectedText) return;
-
   currentInput = editable;
   clearSuggestion();
+  const { selectedText } = getSelectionSnapshot(editable);
+  if (selectedText.trim().length === 0) return;
   scheduleSuggest();
 }
 
 document.addEventListener("mouseup", handleMouseUp, true);
 window.addEventListener("mouseup", handleMouseUp, true);
+
+function handleMouseDown(event: Event) {
+  const editable = getEditableFromEvent(event);
+  if (!editable) return;
+  if (config && (isSensitiveInput(editable, config) || !isSiteAllowed(config))) return;
+
+  currentInput = editable;
+  clearSuggestion();
+}
+
+document.addEventListener("mousedown", handleMouseDown, true);
+window.addEventListener("mousedown", handleMouseDown, true);
 
 document.addEventListener(
   "selectionchange",
@@ -858,6 +888,8 @@ document.addEventListener(
 
     currentInput = editable;
     clearSuggestion();
+    const { selectedText } = getSelectionSnapshot(editable);
+    if (selectedText.trim().length === 0) return;
     scheduleSuggest();
   },
   true
@@ -907,6 +939,17 @@ function handleKeydown(event: KeyboardEvent) {
     applySuggestion(currentInput, currentSuggestionSuffix);
     clearSuggestion();
   } else if (event.key === "Escape") {
+    clearSuggestion();
+  } else if (
+    event.key === "ArrowLeft" ||
+    event.key === "ArrowRight" ||
+    event.key === "ArrowUp" ||
+    event.key === "ArrowDown" ||
+    event.key === "Home" ||
+    event.key === "End" ||
+    event.key === "PageUp" ||
+    event.key === "PageDown"
+  ) {
     clearSuggestion();
   }
 }
