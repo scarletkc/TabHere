@@ -2,10 +2,10 @@ import type { TabHereConfig, ShortcutKey } from "./types";
 
 const DEFAULT_CONFIG: TabHereConfig = {
   apiKey: undefined,
-  model: "gpt-5.2-mini",
+  model: "gpt-5-nano",
   baseUrl: "https://api.openai.com/v1",
   maxOutputTokens: 0,
-  temperature: 0.2,
+  temperature: 0.8,
   debounceMs: 500,
   minTriggerChars: 3,
   shortcutKey: "Tab",

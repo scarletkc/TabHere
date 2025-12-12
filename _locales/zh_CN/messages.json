@@ -13,7 +13,7 @@
   "baseUrlPlaceholder": { "message": "https://api.openai.com/v1" },
 
   "modelLabel": { "message": "模型 ID" },
-  "modelPlaceholder": { "message": "gpt-5.2-mini" },
+  "modelPlaceholder": { "message": "gpt-5-nano" },
 
   "maxTokensLabel": { "message": "最大补全长度（tokens，0=不限）" },
   "temperatureLabel": { "message": "温度（temperature）" },
