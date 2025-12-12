@@ -202,7 +202,7 @@ Strict requirements:
 - Do not answer questions or add commentary.
 - Match the surrounding language, style, punctuation, and formatting (including newlines).
 - Keep the insertion moderately short unless the context clearly requires longer.
-- It conforms to the language of [LANGUAGE] and the context of [PAGE-TITLE].
+- It should conform to the context of [PAGE-TITLE].
 ${inputContextSection}
 [LANGUAGE]: Auto
 [PAGE-TITLE]: ${title}
