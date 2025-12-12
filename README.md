@@ -1,5 +1,7 @@
 # TabHere
 
+[![Release](https://img.shields.io/github/v/release/scarletkc/TabHere?style=flat-square)](https://github.com/scarletkc/TabHere/releases)
+
 **English** | **[中文](./docs/README.zh.md)**
 
 ---
