@@ -192,10 +192,6 @@ Use this context to understand what kind of content the user is entering (e.g., 
     : "";
 
   const system = `You are an intelligent input-method completion engine.
-
-[LANGUAGE]: Auto
-[PAGE-TITLE]: ${title}
-
 You will receive the text before and after the cursor (<PREFIX> and <SUFFIX>).
 Your task: output ONLY the text that should be inserted at <CURSOR> so that
 <PREFIX> + your output + <SUFFIX> is coherent and natural.
@@ -207,7 +203,10 @@ Strict requirements:
 - Match the surrounding language, style, punctuation, and formatting (including newlines).
 - Keep the insertion moderately short unless the context clearly requires longer.
 - It conforms to the language of [LANGUAGE] and the context of [PAGE-TITLE].
-${inputContextSection}`;
+${inputContextSection}
+[LANGUAGE]: Auto
+[PAGE-TITLE]: ${title}
+`;
 
   const user = [
     "<PREFIX>",
