@@ -62,7 +62,6 @@ const DEFAULT_CONFIG: TabHereConfig = {
 };
 
 const CONFIG_KEYS = [
-  "tabhere_api_key",
   "tabhere_model",
   "tabhere_base_url",
   "tabhere_max_output_tokens",
@@ -77,7 +76,6 @@ const CONFIG_KEYS = [
 ] as const;
 
 type ConfigStorageShape = {
-  tabhere_api_key?: string;
   tabhere_model?: string;
   tabhere_base_url?: string;
   tabhere_max_output_tokens?: number;
@@ -114,7 +112,6 @@ async function getConfigLocal(): Promise<TabHereConfig> {
   const res = await storageGet<ConfigStorageShape>(storage, CONFIG_KEYS);
 
   return {
-    apiKey: res.tabhere_api_key,
     model: res.tabhere_model || DEFAULT_CONFIG.model,
     baseUrl: res.tabhere_base_url || DEFAULT_CONFIG.baseUrl,
     maxOutputTokens: res.tabhere_max_output_tokens ?? DEFAULT_CONFIG.maxOutputTokens,
