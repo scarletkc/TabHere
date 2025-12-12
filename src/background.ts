@@ -51,16 +51,18 @@ function buildSuggestionCacheKey(
   config: Awaited<ReturnType<typeof getConfig>>,
   prefix: string,
   suffixContext?: string,
-  pageTitle?: string
+  pageTitle?: string,
+  inputContext?: InputContext
 ): string | null {
   const suffix = suffixContext ?? "";
   const title = normalizePageTitle(pageTitle);
-  if (prefix.length + suffix.length + title.length > SUGGESTION_CACHE_MAX_CONTEXT_CHARS) {
+  const inputContextText = formatInputContext(inputContext);
+  if (prefix.length + suffix.length + title.length + inputContextText.length > SUGGESTION_CACHE_MAX_CONTEXT_CHARS) {
     return null;
   }
 
   return JSON.stringify({
-    v: 1,
+    v: 2,
     baseUrl: config.baseUrl,
     model: config.model,
     temperature: config.temperature,
@@ -70,7 +72,9 @@ function buildSuggestionCacheKey(
     prefixLen: prefix.length,
     prefixHash: fnv1a64Hex(prefix),
     suffixLen: suffix.length,
-    suffixHash: fnv1a64Hex(suffix)
+    suffixHash: fnv1a64Hex(suffix),
+    inputContextLen: inputContextText.length,
+    inputContextHash: fnv1a64Hex(inputContextText)
   });
 }
 
@@ -305,7 +309,7 @@ chrome.runtime.onMessage.addListener(
           return;
         }
 
-        const cacheKey = buildSuggestionCacheKey(config, prefix, suffixContext, pageTitle);
+        const cacheKey = buildSuggestionCacheKey(config, prefix, suffixContext, pageTitle, inputContext);
 
         if (cacheKey) {
           const cached = getCachedSuggestion(cacheKey);

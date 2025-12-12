@@ -447,7 +447,8 @@ function findNearbyText(el: HTMLElement): string | undefined {
   // 检查父元素中的直接文本节点
   if (remaining > 0 && el.parentElement) {
     const parent = el.parentElement;
-    for (const node of parent.childNodes) {
+    const childNodes = Array.from(parent.childNodes);
+    for (const node of childNodes) {
       if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent?.trim();
         if (text && text.length > 0) {
