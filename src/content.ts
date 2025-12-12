@@ -1,5 +1,6 @@
 import { SuggestionOverlay } from "./ui/overlay";
 import type {
+  InputContext,
   SuggestionRequestMessage,
   SuggestionResponseMessage,
   TabHereConfig
@@ -13,6 +14,8 @@ let debounceTimer: number | null = null;
 let config: TabHereConfig | null = null;
 let lastFailureAt = 0;
 let contextInvalidated = false;
+/** 缓存的输入框上下文，焦点变化时失效 */
+let cachedInputContext: InputContext | null = null;
 
 const overlay = new SuggestionOverlay();
 
@@ -260,6 +263,278 @@ function getPrefixSuffixAtCaret(el: HTMLElement): { prefix: string; suffixContex
   };
 }
 
+// ============ 输入框邻近上下文抓取 ============
+
+/** 最大向上遍历 DOM 层级 */
+const MAX_ANCESTOR_DEPTH = 5;
+/** 最大邻近文本字符数 */
+const MAX_NEARBY_TEXT_LENGTH = 500;
+
+/**
+ * 截断文本到指定长度
+ */
+function truncateText(text: string, maxLength: number): string {
+  const trimmed = text.trim().replace(/\s+/g, " ");
+  if (trimmed.length <= maxLength) return trimmed;
+  return trimmed.slice(0, maxLength) + "…";
+}
+
+/**
+ * 获取关联的 label 文本
+ * 支持 for 属性关联和父级包裹两种方式
+ */
+function getAssociatedLabel(el: HTMLElement): string | undefined {
+  // 方式1: 通过 for 属性关联
+  const id = el.id;
+  if (id) {
+    const label = document.querySelector(`label[for="${CSS.escape(id)}"]`);
+    if (label) {
+      const text = label.textContent?.trim();
+      if (text) return text;
+    }
+  }
+
+  // 方式2: label 作为父元素包裹 input
+  const parentLabel = el.closest("label");
+  if (parentLabel) {
+    // 获取 label 的文本，排除 input 本身的内容
+    const clone = parentLabel.cloneNode(true) as HTMLElement;
+    const inputs = clone.querySelectorAll("input, textarea, select");
+    inputs.forEach((input) => input.remove());
+    const text = clone.textContent?.trim();
+    if (text) return text;
+  }
+
+  return undefined;
+}
+
+/**
+ * 获取 placeholder 属性
+ */
+function getPlaceholder(el: HTMLElement): string | undefined {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    const placeholder = el.placeholder?.trim();
+    if (placeholder) return placeholder;
+  }
+  // contenteditable 可能有 data-placeholder
+  const dataPlaceholder = el.getAttribute("data-placeholder")?.trim();
+  if (dataPlaceholder) return dataPlaceholder;
+
+  return undefined;
+}
+
+/**
+ * 获取 aria-label
+ */
+function getAriaLabel(el: HTMLElement): string | undefined {
+  return el.getAttribute("aria-label")?.trim() || undefined;
+}
+
+/**
+ * 获取 aria-describedby 引用的描述文本
+ */
+function getAriaDescription(el: HTMLElement): string | undefined {
+  const describedBy = el.getAttribute("aria-describedby");
+  if (!describedBy) return undefined;
+
+  const ids = describedBy.split(/\s+/).filter(Boolean);
+  const texts: string[] = [];
+  for (const id of ids) {
+    const descEl = document.getElementById(id);
+    if (descEl) {
+      const text = descEl.textContent?.trim();
+      if (text) texts.push(text);
+    }
+  }
+  return texts.length > 0 ? texts.join(" ") : undefined;
+}
+
+/**
+ * 获取字段名 (name 或 id 属性)
+ */
+function getFieldName(el: HTMLElement): string | undefined {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    const name = el.name?.trim();
+    if (name) return name;
+  }
+  const id = el.id?.trim();
+  if (id) return id;
+
+  return undefined;
+}
+
+/**
+ * 向上遍历 DOM 寻找最近的标题元素
+ */
+function findNearbyHeading(el: HTMLElement): string | undefined {
+  let current: HTMLElement | null = el;
+  let depth = 0;
+
+  while (current && depth < MAX_ANCESTOR_DEPTH) {
+    // 检查 legend (fieldset 标题)
+    if (current.tagName === "FIELDSET") {
+      const legend = current.querySelector("legend");
+      if (legend) {
+        const text = legend.textContent?.trim();
+        if (text) return text;
+      }
+    }
+
+    // 在当前元素之前查找标题
+    let sibling: Element | null = current.previousElementSibling;
+    while (sibling) {
+      if (/^H[1-6]$/.test(sibling.tagName)) {
+        const text = sibling.textContent?.trim();
+        if (text) return text;
+      }
+      // 也检查 legend
+      if (sibling.tagName === "LEGEND") {
+        const text = sibling.textContent?.trim();
+        if (text) return text;
+      }
+      sibling = sibling.previousElementSibling;
+    }
+
+    current = current.parentElement;
+    depth++;
+  }
+
+  // 最后尝试查找页面上最近的标题
+  const headings = document.querySelectorAll("h1, h2, h3, h4, h5, h6");
+  if (headings.length > 0) {
+    // 返回最后一个标题（通常是最接近内容的）
+    const lastHeading = headings[headings.length - 1];
+    const text = lastHeading.textContent?.trim();
+    if (text) return text;
+  }
+
+  return undefined;
+}
+
+/**
+ * 获取邻近元素的描述/提示文本
+ */
+function findNearbyText(el: HTMLElement): string | undefined {
+  const texts: string[] = [];
+  let remaining = MAX_NEARBY_TEXT_LENGTH;
+
+  // 收集前面的兄弟元素文本（最多2个）
+  let prevSibling: Element | null = el.previousElementSibling;
+  let prevCollected = 0;
+  while (prevSibling && prevCollected < 2 && remaining > 0) {
+    // 跳过脚本、样式和输入元素
+    if (
+      prevSibling.tagName === "SCRIPT" ||
+      prevSibling.tagName === "STYLE" ||
+      prevSibling.tagName === "INPUT" ||
+      prevSibling.tagName === "TEXTAREA" ||
+      prevSibling.tagName === "SELECT"
+    ) {
+      prevSibling = prevSibling.previousElementSibling;
+      continue;
+    }
+    // 获取可见文本
+    const text = prevSibling.textContent?.trim();
+    if (text && text.length > 0) {
+      const truncated = text.slice(0, remaining);
+      texts.push(truncated);
+      remaining -= truncated.length;
+      prevCollected++;
+    }
+    prevSibling = prevSibling.previousElementSibling;
+  }
+
+  // 检查父元素中的直接文本节点
+  if (remaining > 0 && el.parentElement) {
+    const parent = el.parentElement;
+    for (const node of parent.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim();
+        if (text && text.length > 0) {
+          const truncated = text.slice(0, remaining);
+          texts.push(truncated);
+          remaining -= truncated.length;
+          if (remaining <= 0) break;
+        }
+      }
+    }
+  }
+
+  // 后面的兄弟元素（最多1个，通常是提示信息）
+  if (remaining > 0) {
+    const nextSibling = el.nextElementSibling;
+    if (
+      nextSibling &&
+      nextSibling.tagName !== "SCRIPT" &&
+      nextSibling.tagName !== "STYLE" &&
+      nextSibling.tagName !== "INPUT" &&
+      nextSibling.tagName !== "TEXTAREA"
+    ) {
+      const text = nextSibling.textContent?.trim();
+      if (text && text.length > 0) {
+        texts.push(text.slice(0, remaining));
+      }
+    }
+  }
+
+  const combined = texts.join(" ").trim();
+  return combined.length > 0 ? truncateText(combined, MAX_NEARBY_TEXT_LENGTH) : undefined;
+}
+
+/**
+ * 获取输入框的邻近上下文信息
+ * 结果会被缓存，直到焦点变化
+ */
+function getInputNearbyContext(el: HTMLElement): InputContext {
+  // 使用缓存
+  if (cachedInputContext && currentInput === el) {
+    return cachedInputContext;
+  }
+
+  const context: InputContext = {};
+
+  // 获取各类上下文信息
+  const label = getAssociatedLabel(el);
+  if (label) context.label = truncateText(label, 200);
+
+  const placeholder = getPlaceholder(el);
+  if (placeholder) context.placeholder = truncateText(placeholder, 200);
+
+  const ariaLabel = getAriaLabel(el);
+  if (ariaLabel) context.ariaLabel = truncateText(ariaLabel, 200);
+
+  const ariaDescription = getAriaDescription(el);
+  if (ariaDescription) context.ariaDescription = truncateText(ariaDescription, 200);
+
+  const fieldName = getFieldName(el);
+  if (fieldName) context.fieldName = fieldName;
+
+  const nearbyHeading = findNearbyHeading(el);
+  if (nearbyHeading) context.nearbyHeading = truncateText(nearbyHeading, 200);
+
+  const nearbyText = findNearbyText(el);
+  if (nearbyText) context.nearbyText = nearbyText;
+
+  // 缓存结果
+  cachedInputContext = context;
+  return context;
+}
+
+/**
+ * 检查 InputContext 是否有实际内容
+ */
+function hasInputContext(ctx: InputContext): boolean {
+  return !!(
+    ctx.label ||
+    ctx.placeholder ||
+    ctx.ariaLabel ||
+    ctx.ariaDescription ||
+    ctx.fieldName ||
+    ctx.nearbyHeading ||
+    ctx.nearbyText
+  );
+}
+
 function applySuggestion(el: HTMLElement, suffix: string) {
   if (!suffix) return;
   if (el.isContentEditable) {
@@ -381,13 +656,17 @@ function scheduleSuggest() {
     const requestId = crypto.randomUUID();
     latestRequestId = requestId;
 
+    // 获取输入框邻近上下文
+    const inputContext = getInputNearbyContext(currentInput);
+
     const message: SuggestionRequestMessage = {
       type: "TABHERE_REQUEST_SUGGESTION",
       requestId,
       prefix,
       suffixContext,
       pageTitle: getPageTitleForPrompt(),
-      maxOutputTokens: config.maxOutputTokens
+      maxOutputTokens: config.maxOutputTokens,
+      inputContext: hasInputContext(inputContext) ? inputContext : undefined
     };
 
     const runtime = getRuntime();
@@ -418,13 +697,19 @@ function handleFocusIn(event: Event) {
   const editable = getEditableFromEvent(event);
   if (!editable) {
     currentInput = null;
+    cachedInputContext = null; // 清除上下文缓存
     clearSuggestion();
     return;
   }
   if (config && (!isSiteAllowed(config) || isSensitiveInput(editable, config))) {
     currentInput = null;
+    cachedInputContext = null; // 清除上下文缓存
     clearSuggestion();
     return;
+  }
+  // 焦点变化时清除上下文缓存
+  if (currentInput !== editable) {
+    cachedInputContext = null;
   }
   currentInput = editable;
   clearSuggestion();
@@ -442,6 +727,7 @@ document.addEventListener(
       return;
     }
     currentInput = null;
+    cachedInputContext = null; // 清除上下文缓存
     clearSuggestion();
   },
   true

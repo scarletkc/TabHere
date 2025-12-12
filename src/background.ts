@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { getConfig } from "./shared/config";
-import type { SuggestionRequestMessage, SuggestionResponseMessage } from "./shared/types";
+import type { InputContext, SuggestionRequestMessage, SuggestionResponseMessage } from "./shared/types";
 
 type ClientCache = {
   apiKey?: string;
@@ -143,12 +143,63 @@ function extractOutputText(resp: any): string {
   return "";
 }
 
-function buildPrompt(prefix: string, suffixContext?: string, pageTitle?: string) {
-  const system = `
-You are an intelligent input-method completion engine.
+/**
+ * 将 InputContext 格式化为提示词中的上下文描述
+ */
+function formatInputContext(inputContext?: InputContext): string {
+  if (!inputContext) return "";
+
+  const parts: string[] = [];
+
+  if (inputContext.label) {
+    parts.push(`Label: ${inputContext.label}`);
+  }
+  if (inputContext.placeholder) {
+    parts.push(`Placeholder: ${inputContext.placeholder}`);
+  }
+  if (inputContext.ariaLabel) {
+    parts.push(`Aria-label: ${inputContext.ariaLabel}`);
+  }
+  if (inputContext.ariaDescription) {
+    parts.push(`Description: ${inputContext.ariaDescription}`);
+  }
+  if (inputContext.fieldName) {
+    parts.push(`Field name: ${inputContext.fieldName}`);
+  }
+  if (inputContext.nearbyHeading) {
+    parts.push(`Section: ${inputContext.nearbyHeading}`);
+  }
+  if (inputContext.nearbyText) {
+    parts.push(`Nearby text: ${inputContext.nearbyText}`);
+  }
+
+  return parts.length > 0 ? parts.join("\n") : "";
+}
+
+function buildPrompt(prefix: string, suffixContext?: string, pageTitle?: string, inputContext?: InputContext) {
+  const inputContextText = formatInputContext(inputContext);
+  const title = normalizePageTitle(pageTitle);
+  const suffix = suffixContext ?? "";
+  
+  const inputContextSection = inputContextText
+    ? `
+Additionally, you are given context about the input field:
+<INPUT-CONTEXT>
+${inputContextText}
+</INPUT-CONTEXT>
+Use this context to understand what kind of content the user is entering (e.g., email subject, recipient name, message body, search query, etc.) and provide more relevant completions.
+`
+    : "";
+
+  const system = `You are an intelligent input-method completion engine.
+
+[LANGUAGE]: Auto
+[PAGE-TITLE]: ${title}
+
 You will receive the text before and after the cursor (<PREFIX> and <SUFFIX>).
 Your task: output ONLY the text that should be inserted at <CURSOR> so that
 <PREFIX> + your output + <SUFFIX> is coherent and natural.
+
 Strict requirements:
 - Output only the insertion text. No explanations, no tags, no quotes, no Markdown fences.
 - Do not repeat or rewrite any part of <PREFIX> or <SUFFIX>.
@@ -156,14 +207,9 @@ Strict requirements:
 - Match the surrounding language, style, punctuation, and formatting (including newlines).
 - Keep the insertion moderately short unless the context clearly requires longer.
 - It conforms to the language of [LANGUAGE] and the context of [PAGE-TITLE].
-`;
+${inputContextSection}`;
 
-  const title = normalizePageTitle(pageTitle);
-  const suffix = suffixContext ?? "";
   const user = [
-    "[LANGUAGE]: Auto",
-    `[PAGE-TITLE]: ${title}`,
-    "",
     "<PREFIX>",
     prefix,
     "</PREFIX>",
@@ -174,7 +220,7 @@ Strict requirements:
     suffix,
     "</SUFFIX>",
     "",
-    "Please return only what should be inserted at <CURSOR>:"
+    "Output only the text to insert at <CURSOR>:"
   ].join("\n");
   return { system, user };
 }
@@ -191,9 +237,10 @@ async function requestSuggestionWithResponses(
   config: Awaited<ReturnType<typeof getConfig>>,
   prefix: string,
   suffixContext?: string,
-  pageTitle?: string
+  pageTitle?: string,
+  inputContext?: InputContext
 ): Promise<string> {
-  const { system, user } = buildPrompt(prefix, suffixContext, pageTitle);
+  const { system, user } = buildPrompt(prefix, suffixContext, pageTitle, inputContext);
   const resp = await client.responses.create({
     model: config.model,
     max_output_tokens: config.maxOutputTokens,
@@ -218,9 +265,10 @@ async function requestSuggestionWithChat(
   config: Awaited<ReturnType<typeof getConfig>>,
   prefix: string,
   suffixContext?: string,
-  pageTitle?: string
+  pageTitle?: string,
+  inputContext?: InputContext
 ): Promise<string> {
-  const { system, user } = buildPrompt(prefix, suffixContext, pageTitle);
+  const { system, user } = buildPrompt(prefix, suffixContext, pageTitle, inputContext);
   const resp = await client.chat.completions.create({
     model: config.model,
     temperature: config.temperature,
@@ -251,7 +299,7 @@ chrome.runtime.onMessage.addListener(
       try {
         const config = await getConfig();
         const client = await createOpenAIClient();
-        const { requestId, prefix, suffixContext, pageTitle } = message;
+        const { requestId, prefix, suffixContext, pageTitle, inputContext } = message;
 
         if (!prefix || !prefix.trim()) {
           sendResponse({ type: "TABHERE_SUGGESTION", requestId, suffix: "" });
@@ -271,10 +319,10 @@ chrome.runtime.onMessage.addListener(
         const fetchSuggestion = async (): Promise<string> => {
           let outputText = "";
           try {
-            outputText = await requestSuggestionWithResponses(client, config, prefix, suffixContext, pageTitle);
+            outputText = await requestSuggestionWithResponses(client, config, prefix, suffixContext, pageTitle, inputContext);
           } catch (error: any) {
             if (isResponsesUnsupported(error)) {
-              outputText = await requestSuggestionWithChat(client, config, prefix, suffixContext, pageTitle);
+              outputText = await requestSuggestionWithChat(client, config, prefix, suffixContext, pageTitle, inputContext);
             } else {
               throw error;
             }
