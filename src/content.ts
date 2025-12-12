@@ -233,32 +233,42 @@ function getInputText(el: HTMLElement): string {
   return (el as HTMLInputElement | HTMLTextAreaElement).value || "";
 }
 
-function getPrefixSuffixAtCaret(el: HTMLElement): { prefix: string; suffixContext: string } {
+function getSelectionSnapshot(el: HTMLElement): { prefix: string; selectedText: string; suffixContext: string } {
   if (el.isContentEditable) {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) {
       const fullText = getInputText(el);
-      return { prefix: fullText, suffixContext: "" };
+      return { prefix: fullText, selectedText: "", suffixContext: "" };
     }
     const range = selection.getRangeAt(0);
+    if (!el.contains(range.startContainer) || !el.contains(range.endContainer)) {
+      const fullText = getInputText(el);
+      return { prefix: fullText, selectedText: "", suffixContext: "" };
+    }
+
     const beforeRange = range.cloneRange();
     beforeRange.selectNodeContents(el);
-    beforeRange.setEnd(range.endContainer, range.endOffset);
+    beforeRange.setEnd(range.startContainer, range.startOffset);
     const prefix = beforeRange.toString();
+
+    const selectedText = range.toString();
 
     const afterRange = range.cloneRange();
     afterRange.selectNodeContents(el);
     afterRange.setStart(range.endContainer, range.endOffset);
     const suffixContext = afterRange.toString();
-    return { prefix, suffixContext };
+
+    return { prefix, selectedText, suffixContext };
   }
 
   const input = el as HTMLInputElement | HTMLTextAreaElement;
   const start = input.selectionStart ?? input.value.length;
   const end = input.selectionEnd ?? start;
   const value = input.value || "";
+
   return {
     prefix: value.slice(0, start),
+    selectedText: value.slice(start, end),
     suffixContext: value.slice(end)
   };
 }
@@ -643,8 +653,15 @@ function scheduleSuggest() {
     if (!currentInput || !config) return;
     if (isComposing) return;
 
-    const { prefix, suffixContext } = getPrefixSuffixAtCaret(currentInput);
-    if (prefix.trim().length < config.minTriggerChars) {
+    const { prefix, selectedText, suffixContext } = getSelectionSnapshot(currentInput);
+    const hasSelection = selectedText.length > 0;
+
+    if (hasSelection) {
+      if (selectedText.trim().length === 0) {
+        clearSuggestion();
+        return;
+      }
+    } else if (prefix.trim().length < config.minTriggerChars) {
       clearSuggestion();
       return;
     }
@@ -660,15 +677,26 @@ function scheduleSuggest() {
     // 获取输入框邻近上下文
     const inputContext = getInputNearbyContext(currentInput);
 
-    const message: SuggestionRequestMessage = {
-      type: "TABHERE_REQUEST_SUGGESTION",
-      requestId,
-      prefix,
-      suffixContext,
-      pageTitle: getPageTitleForPrompt(),
-      maxOutputTokens: config.maxOutputTokens,
-      inputContext: hasInputContext(inputContext) ? inputContext : undefined
-    };
+    const message: SuggestionRequestMessage = hasSelection
+      ? {
+          type: "TABHERE_REQUEST_REWRITE",
+          requestId,
+          prefix,
+          selectedText,
+          suffixContext,
+          pageTitle: getPageTitleForPrompt(),
+          maxOutputTokens: config.maxOutputTokens,
+          inputContext: hasInputContext(inputContext) ? inputContext : undefined
+        }
+      : {
+          type: "TABHERE_REQUEST_SUGGESTION",
+          requestId,
+          prefix,
+          suffixContext,
+          pageTitle: getPageTitleForPrompt(),
+          maxOutputTokens: config.maxOutputTokens,
+          inputContext: hasInputContext(inputContext) ? inputContext : undefined
+        };
 
     const runtime = getRuntime();
     if (!runtime) {
@@ -775,6 +803,35 @@ function handleKeyup(event: Event) {
 
 document.addEventListener("keyup", handleKeyup, true);
 window.addEventListener("keyup", handleKeyup, true);
+
+function handleSelect(event: Event) {
+  const editable = getEditableFromEvent(event);
+  if (!editable) return;
+  if (config && (isSensitiveInput(editable, config) || !isSiteAllowed(config))) return;
+
+  currentInput = editable;
+  clearSuggestion();
+  scheduleSuggest();
+}
+
+document.addEventListener("select", handleSelect, true);
+window.addEventListener("select", handleSelect, true);
+
+function handleMouseUp(event: Event) {
+  const editable = getEditableFromEvent(event);
+  if (!editable) return;
+  if (config && (isSensitiveInput(editable, config) || !isSiteAllowed(config))) return;
+
+  const { selectedText } = getSelectionSnapshot(editable);
+  if (!selectedText) return;
+
+  currentInput = editable;
+  clearSuggestion();
+  scheduleSuggest();
+}
+
+document.addEventListener("mouseup", handleMouseUp, true);
+window.addEventListener("mouseup", handleMouseUp, true);
 
 document.addEventListener(
   "selectionchange",

@@ -19,18 +19,32 @@ export type InputContext = {
   nearbyText?: string;
 };
 
-export type SuggestionRequestMessage = {
-  type: "TABHERE_REQUEST_SUGGESTION";
-  requestId: string;
-  prefix: string;
-  suffixContext?: string;
-  pageTitle?: string;
-  cursorOffset?: number;
-  languageHint?: string;
-  maxOutputTokens?: number;
-  /** 输入框邻近上下文 */
-  inputContext?: InputContext;
-};
+export type SuggestionRequestMessage =
+  | {
+      type: "TABHERE_REQUEST_SUGGESTION";
+      requestId: string;
+      prefix: string;
+      suffixContext?: string;
+      pageTitle?: string;
+      cursorOffset?: number;
+      languageHint?: string;
+      maxOutputTokens?: number;
+      /** 输入框邻近上下文 */
+      inputContext?: InputContext;
+    }
+  | {
+      type: "TABHERE_REQUEST_REWRITE";
+      requestId: string;
+      prefix: string;
+      selectedText: string;
+      suffixContext?: string;
+      pageTitle?: string;
+      cursorOffset?: number;
+      languageHint?: string;
+      maxOutputTokens?: number;
+      /** 输入框邻近上下文 */
+      inputContext?: InputContext;
+    };
 
 export type SuggestionResponseMessage = {
   type: "TABHERE_SUGGESTION";

@@ -22,6 +22,8 @@ const SUGGESTION_CACHE_MAX_CONTEXT_CHARS = 4096;
 const suggestionCache = new Map<string, SuggestionCacheEntry>();
 const inflightSuggestions = new Map<string, Promise<string>>();
 
+type RequestIntent = "suggest" | "rewrite";
+
 const actionApi: any = (chrome as any).action || (chrome as any).browserAction;
 if (actionApi?.onClicked) {
   actionApi.onClicked.addListener(() => {
@@ -49,20 +51,28 @@ function normalizePageTitle(pageTitle: string | undefined): string {
 
 function buildSuggestionCacheKey(
   config: Awaited<ReturnType<typeof getConfig>>,
+  intent: RequestIntent,
   prefix: string,
+  selectedText?: string,
   suffixContext?: string,
   pageTitle?: string,
   inputContext?: InputContext
 ): string | null {
+  const selected = selectedText ?? "";
   const suffix = suffixContext ?? "";
   const title = normalizePageTitle(pageTitle);
   const inputContextText = formatInputContext(inputContext);
-  if (prefix.length + suffix.length + title.length + inputContextText.length > SUGGESTION_CACHE_MAX_CONTEXT_CHARS) {
+
+  if (
+    prefix.length + selected.length + suffix.length + title.length + inputContextText.length >
+    SUGGESTION_CACHE_MAX_CONTEXT_CHARS
+  ) {
     return null;
   }
 
   return JSON.stringify({
-    v: 2,
+    v: 3,
+    intent,
     baseUrl: config.baseUrl,
     model: config.model,
     temperature: config.temperature,
@@ -71,6 +81,8 @@ function buildSuggestionCacheKey(
     titleHash: fnv1a64Hex(title),
     prefixLen: prefix.length,
     prefixHash: fnv1a64Hex(prefix),
+    selectedLen: selected.length,
+    selectedHash: fnv1a64Hex(selected),
     suffixLen: suffix.length,
     suffixHash: fnv1a64Hex(suffix),
     inputContextLen: inputContextText.length,
@@ -180,7 +192,17 @@ function formatInputContext(inputContext?: InputContext): string {
   return parts.length > 0 ? parts.join("\n") : "";
 }
 
-function buildPrompt(prefix: string, suffixContext?: string, pageTitle?: string, inputContext?: InputContext) {
+type PromptParts = {
+  system: string;
+  user: string;
+};
+
+function buildSuggestionPrompt(
+  prefix: string,
+  suffixContext?: string,
+  pageTitle?: string,
+  inputContext?: InputContext
+): PromptParts {
   const inputContextText = formatInputContext(inputContext);
   const title = normalizePageTitle(pageTitle);
   const suffix = suffixContext ?? "";
@@ -228,6 +250,63 @@ ${inputContextSection}
   return { system, user };
 }
 
+function buildRewritePrompt(
+  prefix: string,
+  selectedText: string,
+  suffixContext?: string,
+  pageTitle?: string,
+  inputContext?: InputContext
+): PromptParts {
+  const inputContextText = formatInputContext(inputContext);
+  const title = normalizePageTitle(pageTitle);
+  const suffix = suffixContext ?? "";
+
+  const inputContextSection = inputContextText
+    ? `
+Additionally, you are given context about the input field:
+<INPUT-CONTEXT>
+${inputContextText}
+</INPUT-CONTEXT>
+Use this context to understand what kind of content the user is entering (e.g., email subject, recipient name, message body, search query, etc.) and rewrite accordingly.
+`
+    : "";
+
+  const system = `You are an intelligent in-place rewrite engine.
+You will receive the text before and after a selected region (<PREFIX> and <SUFFIX>), plus the selected text (<SELECTED>).
+Your task: output ONLY the rewritten replacement text for <SELECTED> so that
+<PREFIX> + your output + <SUFFIX> is coherent and natural.
+
+Strict requirements:
+- Output only the replacement text. No explanations, no tags, no quotes, no Markdown fences.
+- Do not repeat or rewrite any part of <PREFIX> or <SUFFIX>.
+- Preserve the meaning of <SELECTED> unless the surrounding context clearly indicates a correction is needed.
+- Match the surrounding language, style, punctuation, and formatting (including newlines).
+- Keep the replacement reasonably similar length unless the context clearly requires longer/shorter.
+- It should conform to the context of [PAGE-TITLE].
+${inputContextSection}
+[LANGUAGE]: Auto
+[PAGE-TITLE]: ${title}
+`;
+
+  const user = [
+    "<PREFIX>",
+    prefix,
+    "</PREFIX>",
+    "",
+    "<SELECTED>",
+    selectedText,
+    "</SELECTED>",
+    "",
+    "<SUFFIX>",
+    suffix,
+    "</SUFFIX>",
+    "",
+    "Output only the replacement text for <SELECTED>:"
+  ].join("\n");
+
+  return { system, user };
+}
+
 function isResponsesUnsupported(error: any): boolean {
   const status = error?.status ?? error?.response?.status;
   if (status === 404 || status === 405) return true;
@@ -235,15 +314,11 @@ function isResponsesUnsupported(error: any): boolean {
   return message.includes("not found") && message.includes("404");
 }
 
-async function requestSuggestionWithResponses(
+async function requestWithResponses(
   client: OpenAI,
   config: Awaited<ReturnType<typeof getConfig>>,
-  prefix: string,
-  suffixContext?: string,
-  pageTitle?: string,
-  inputContext?: InputContext
+  prompt: PromptParts
 ): Promise<string> {
-  const { system, user } = buildPrompt(prefix, suffixContext, pageTitle, inputContext);
   const resp = await client.responses.create({
     model: config.model,
     max_output_tokens: config.maxOutputTokens,
@@ -251,27 +326,23 @@ async function requestSuggestionWithResponses(
     input: [
       {
         role: "system",
-        content: system
+        content: prompt.system
       },
       {
         role: "user",
-        content: user
+        content: prompt.user
       }
     ]
   });
 
-  return extractOutputText(resp).trimStart();
+  return extractOutputText(resp);
 }
 
-async function requestSuggestionWithChat(
+async function requestWithChat(
   client: OpenAI,
   config: Awaited<ReturnType<typeof getConfig>>,
-  prefix: string,
-  suffixContext?: string,
-  pageTitle?: string,
-  inputContext?: InputContext
+  prompt: PromptParts
 ): Promise<string> {
-  const { system, user } = buildPrompt(prefix, suffixContext, pageTitle, inputContext);
   const resp = await client.chat.completions.create({
     model: config.model,
     temperature: config.temperature,
@@ -279,22 +350,22 @@ async function requestSuggestionWithChat(
     messages: [
       {
         role: "system",
-        content: system
+        content: prompt.system
       },
       {
         role: "user",
-        content: user
+        content: prompt.user
       }
     ]
   });
 
   const text = resp?.choices?.[0]?.message?.content ?? "";
-  return String(text).trimStart();
+  return String(text);
 }
 
 chrome.runtime.onMessage.addListener(
   (message: SuggestionRequestMessage, _sender, sendResponse: (res: SuggestionResponseMessage) => void) => {
-    if (message?.type !== "TABHERE_REQUEST_SUGGESTION") {
+    if (message?.type !== "TABHERE_REQUEST_SUGGESTION" && message?.type !== "TABHERE_REQUEST_REWRITE") {
       return;
     }
 
@@ -303,13 +374,30 @@ chrome.runtime.onMessage.addListener(
         const config = await getConfig();
         const client = await createOpenAIClient();
         const { requestId, prefix, suffixContext, pageTitle, inputContext } = message;
+        const intent: RequestIntent = message.type === "TABHERE_REQUEST_REWRITE" ? "rewrite" : "suggest";
+        const selectedText = message.type === "TABHERE_REQUEST_REWRITE" ? message.selectedText : "";
 
-        if (!prefix || !prefix.trim()) {
-          sendResponse({ type: "TABHERE_SUGGESTION", requestId, suffix: "" });
-          return;
+        if (intent === "rewrite") {
+          if (!selectedText || !selectedText.trim()) {
+            sendResponse({ type: "TABHERE_SUGGESTION", requestId, suffix: "" });
+            return;
+          }
+        } else {
+          if (!prefix || !prefix.trim()) {
+            sendResponse({ type: "TABHERE_SUGGESTION", requestId, suffix: "" });
+            return;
+          }
         }
 
-        const cacheKey = buildSuggestionCacheKey(config, prefix, suffixContext, pageTitle, inputContext);
+        const cacheKey = buildSuggestionCacheKey(
+          config,
+          intent,
+          prefix,
+          selectedText,
+          suffixContext,
+          pageTitle,
+          inputContext
+        );
 
         if (cacheKey) {
           const cached = getCachedSuggestion(cacheKey);
@@ -320,15 +408,24 @@ chrome.runtime.onMessage.addListener(
         }
 
         const fetchSuggestion = async (): Promise<string> => {
+          const prompt =
+            intent === "rewrite"
+              ? buildRewritePrompt(prefix, selectedText, suffixContext, pageTitle, inputContext)
+              : buildSuggestionPrompt(prefix, suffixContext, pageTitle, inputContext);
+
           let outputText = "";
           try {
-            outputText = await requestSuggestionWithResponses(client, config, prefix, suffixContext, pageTitle, inputContext);
+            outputText = await requestWithResponses(client, config, prompt);
           } catch (error: any) {
             if (isResponsesUnsupported(error)) {
-              outputText = await requestSuggestionWithChat(client, config, prefix, suffixContext, pageTitle, inputContext);
+              outputText = await requestWithChat(client, config, prompt);
             } else {
               throw error;
             }
+          }
+
+          if (intent === "suggest") {
+            return outputText.trimStart();
           }
           return outputText;
         };
