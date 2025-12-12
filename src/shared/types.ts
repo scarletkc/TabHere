@@ -53,7 +53,7 @@ export type SuggestionResponseMessage = {
   error?: string;
 };
 
-export type ShortcutKey = "Tab" | "CtrlSpace";
+export type ShortcutKey = "Tab" | "Shift" | "Ctrl";
 
 export type TabHereConfig = {
   apiKey?: string;

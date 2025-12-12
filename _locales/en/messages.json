@@ -31,7 +31,8 @@
 
   "shortcutLabel": { "message": "Shortcut" },
   "shortcutTabOption": { "message": "Tab" },
-  "shortcutCtrlSpaceOption": { "message": "Ctrl + Space" },
+  "shortcutShiftOption": { "message": "Shift" },
+  "shortcutCtrlOption": { "message": "Ctrl" },
 
   "useSyncLabel": { "message": "Sync settings & API key (chrome.storage.sync)" },
   "disableSensitiveLabel": { "message": "Disable on sensitive inputs (password/OTP)" },

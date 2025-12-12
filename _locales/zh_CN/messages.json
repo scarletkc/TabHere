@@ -31,7 +31,8 @@
 
   "shortcutLabel": { "message": "快捷键" },
   "shortcutTabOption": { "message": "Tab" },
-  "shortcutCtrlSpaceOption": { "message": "Ctrl + Space" },
+  "shortcutShiftOption": { "message": "Shift" },
+  "shortcutCtrlOption": { "message": "Ctrl" },
 
   "useSyncLabel": { "message": "同步设置与 API Key（chrome.storage.sync）" },
   "disableSensitiveLabel": { "message": "在敏感输入框禁用（如密码/验证码）" },

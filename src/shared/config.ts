@@ -16,6 +16,13 @@ const DEFAULT_CONFIG: TabHereConfig = {
   disableOnSensitive: true
 };
 
+const SHORTCUT_KEYS = ["Tab", "Shift", "Ctrl"] as const satisfies readonly ShortcutKey[];
+
+function normalizeShortcutKey(value: unknown, fallback: ShortcutKey): ShortcutKey {
+  if (typeof value !== "string") return fallback;
+  return (SHORTCUT_KEYS as readonly string[]).includes(value) ? (value as ShortcutKey) : fallback;
+}
+
 const CONFIG_KEYS = [
   "tabhere_api_key",
   "tabhere_user_instructions",
@@ -41,7 +48,7 @@ type ConfigStorageShape = {
   tabhere_temperature?: number;
   tabhere_debounce_ms?: number;
   tabhere_min_trigger_chars?: number;
-  tabhere_shortcut_key?: ShortcutKey;
+  tabhere_shortcut_key?: unknown;
   tabhere_use_sync?: boolean;
   tabhere_disabled_sites?: string[];
   tabhere_enabled_sites?: string[];
@@ -98,7 +105,7 @@ export async function getConfig(): Promise<TabHereConfig> {
     temperature: res.tabhere_temperature ?? DEFAULT_CONFIG.temperature,
     debounceMs: res.tabhere_debounce_ms ?? DEFAULT_CONFIG.debounceMs,
     minTriggerChars: res.tabhere_min_trigger_chars ?? DEFAULT_CONFIG.minTriggerChars,
-    shortcutKey: res.tabhere_shortcut_key || DEFAULT_CONFIG.shortcutKey,
+    shortcutKey: normalizeShortcutKey(res.tabhere_shortcut_key, DEFAULT_CONFIG.shortcutKey),
     useSync,
     disabledSites: res.tabhere_disabled_sites ?? DEFAULT_CONFIG.disabledSites,
     enabledSites: res.tabhere_enabled_sites ?? DEFAULT_CONFIG.enabledSites,

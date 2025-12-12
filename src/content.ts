@@ -16,6 +16,7 @@ let lastFailureAt = 0;
 let contextInvalidated = false;
 /** 缓存的输入框上下文，焦点变化时失效 */
 let cachedInputContext: InputContext | null = null;
+let modifierShortcutPending: "Shift" | "Ctrl" | null = null;
 
 const overlay = new SuggestionOverlay();
 
@@ -65,6 +66,16 @@ const DEFAULT_CONFIG: TabHereConfig = {
   disableOnSensitive: true
 };
 
+const SHORTCUT_KEYS = ["Tab", "Shift", "Ctrl"] as const satisfies readonly TabHereConfig["shortcutKey"][];
+
+function normalizeShortcutKey(
+  value: unknown,
+  fallback: TabHereConfig["shortcutKey"]
+): TabHereConfig["shortcutKey"] {
+  if (typeof value !== "string") return fallback;
+  return (SHORTCUT_KEYS as readonly string[]).includes(value) ? (value as TabHereConfig["shortcutKey"]) : fallback;
+}
+
 const CONFIG_KEYS = [
   "tabhere_user_instructions",
   "tabhere_model",
@@ -88,7 +99,7 @@ type ConfigStorageShape = {
   tabhere_temperature?: number;
   tabhere_debounce_ms?: number;
   tabhere_min_trigger_chars?: number;
-  tabhere_shortcut_key?: TabHereConfig["shortcutKey"];
+  tabhere_shortcut_key?: unknown;
   tabhere_use_sync?: boolean;
   tabhere_disabled_sites?: string[];
   tabhere_enabled_sites?: string[];
@@ -140,7 +151,7 @@ async function getConfigLocal(): Promise<TabHereConfig> {
     temperature: res.tabhere_temperature ?? DEFAULT_CONFIG.temperature,
     debounceMs: res.tabhere_debounce_ms ?? DEFAULT_CONFIG.debounceMs,
     minTriggerChars: res.tabhere_min_trigger_chars ?? DEFAULT_CONFIG.minTriggerChars,
-    shortcutKey: res.tabhere_shortcut_key || DEFAULT_CONFIG.shortcutKey,
+    shortcutKey: normalizeShortcutKey(res.tabhere_shortcut_key, DEFAULT_CONFIG.shortcutKey),
     useSync,
     disabledSites: res.tabhere_disabled_sites ?? DEFAULT_CONFIG.disabledSites,
     enabledSites: res.tabhere_enabled_sites ?? DEFAULT_CONFIG.enabledSites,
@@ -633,6 +644,7 @@ function setNativeValue(input: HTMLInputElement | HTMLTextAreaElement, value: st
 
 function clearSuggestion() {
   currentSuggestionSuffix = "";
+  modifierShortcutPending = null;
   overlay.hide();
 }
 
@@ -808,6 +820,27 @@ function handleKeyup(event: Event) {
   if (!editable) return;
 
   const keyEvent = event as KeyboardEvent;
+
+  if (modifierShortcutPending) {
+    const pending = modifierShortcutPending;
+    const expectedKey = pending === "Shift" ? "Shift" : "Control";
+    if (keyEvent.key === expectedKey) {
+      modifierShortcutPending = null;
+
+      if (currentSuggestionSuffix && config) {
+        const shortcutMatches =
+          (pending === "Shift" && config.shortcutKey === "Shift") || (pending === "Ctrl" && config.shortcutKey === "Ctrl");
+
+        if (shortcutMatches) {
+          currentInput = editable;
+          applySuggestion(editable, currentSuggestionSuffix);
+          clearSuggestion();
+          return;
+        }
+      }
+    }
+  }
+
   const isEditingKey =
     keyEvent.key.length === 1 ||
     keyEvent.key === "Backspace" ||
@@ -932,20 +965,37 @@ document.addEventListener(
 window.addEventListener("keydown", handleKeydown, true);
 
 function handleKeydown(event: KeyboardEvent) {
-  if (!currentInput || !config) return;
-  if (!currentSuggestionSuffix) return;
   if (contextInvalidated) return;
+  if (!config) return;
+
+  if (config.shortcutKey === "Shift" && event.key === "Shift") {
+    if (currentInput && currentSuggestionSuffix) {
+      modifierShortcutPending = "Shift";
+    }
+    return;
+  }
+
+  if (config.shortcutKey === "Ctrl" && event.key === "Control") {
+    if (currentInput && currentSuggestionSuffix) {
+      modifierShortcutPending = "Ctrl";
+    }
+    return;
+  }
+
+  if (modifierShortcutPending) {
+    const pendingKey = modifierShortcutPending === "Shift" ? "Shift" : "Control";
+    if (event.key !== pendingKey) {
+      modifierShortcutPending = null;
+    }
+  }
+
+  if (!currentInput) return;
+  if (!currentSuggestionSuffix) return;
 
   const isTabShortcut =
     config.shortcutKey === "Tab" && event.key === "Tab" && !event.ctrlKey && !event.metaKey;
-  const isCtrlSpaceShortcut =
-    config.shortcutKey === "CtrlSpace" &&
-    event.ctrlKey &&
-    (event.code === "Space" || event.key === " " || event.key === "Spacebar" || event.key === "Space");
 
-  const shortcutMatches = isTabShortcut || isCtrlSpaceShortcut;
-
-  if (shortcutMatches) {
+  if (isTabShortcut) {
     event.preventDefault();
     applySuggestion(currentInput, currentSuggestionSuffix);
     clearSuggestion();
