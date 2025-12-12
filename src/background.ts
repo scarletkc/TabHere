@@ -49,6 +49,18 @@ function normalizePageTitle(pageTitle: string | undefined): string {
   return text.length > 120 ? text.slice(0, 120) : text;
 }
 
+function formatLocalTimeHour(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = now.getHours();
+  const period = hours < 12 ? "AM" : "PM";
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  const hour12Text = String(hour12).padStart(2, "0");
+  return `${year}-${month}-${day} ${hour12Text}${period}`;
+}
+
 function buildSuggestionCacheKey(
   config: Awaited<ReturnType<typeof getConfig>>,
   intent: RequestIntent,
@@ -61,17 +73,18 @@ function buildSuggestionCacheKey(
   const selected = selectedText ?? "";
   const suffix = suffixContext ?? "";
   const title = normalizePageTitle(pageTitle);
+  const localTime = formatLocalTimeHour();
   const inputContextText = formatInputContext(inputContext);
 
   if (
-    prefix.length + selected.length + suffix.length + title.length + inputContextText.length >
+    prefix.length + selected.length + suffix.length + title.length + localTime.length + inputContextText.length >
     SUGGESTION_CACHE_MAX_CONTEXT_CHARS
   ) {
     return null;
   }
 
   return JSON.stringify({
-    v: 3,
+    v: 4,
     intent,
     baseUrl: config.baseUrl,
     model: config.model,
@@ -79,6 +92,8 @@ function buildSuggestionCacheKey(
     maxOutputTokens: config.maxOutputTokens,
     titleLen: title.length,
     titleHash: fnv1a64Hex(title),
+    localTimeLen: localTime.length,
+    localTimeHash: fnv1a64Hex(localTime),
     prefixLen: prefix.length,
     prefixHash: fnv1a64Hex(prefix),
     selectedLen: selected.length,
@@ -206,6 +221,7 @@ function buildSuggestionPrompt(
   const inputContextText = formatInputContext(inputContext);
   const title = normalizePageTitle(pageTitle);
   const suffix = suffixContext ?? "";
+  const localTime = formatLocalTimeHour();
   
   const inputContextSection = inputContextText
     ? `
@@ -231,6 +247,7 @@ Strict requirements:
 - It should conform to the context of [PAGE-TITLE].
 ${inputContextSection}
 [LANGUAGE]: Auto
+[LOCAL-TIME]: ${localTime}
 [PAGE-TITLE]: ${title}
 `;
 
@@ -260,6 +277,7 @@ function buildRewritePrompt(
   const inputContextText = formatInputContext(inputContext);
   const title = normalizePageTitle(pageTitle);
   const suffix = suffixContext ?? "";
+  const localTime = formatLocalTimeHour();
 
   const inputContextSection = inputContextText
     ? `
@@ -285,6 +303,7 @@ Strict requirements:
 - It should conform to the context of [PAGE-TITLE].
 ${inputContextSection}
 [LANGUAGE]: Auto
+[LOCAL-TIME]: ${localTime}
 [PAGE-TITLE]: ${title}
 `;
 
