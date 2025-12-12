@@ -48,7 +48,7 @@
     "message": "This API key doesn't look right (should start with sk-). Save anyway?"
   },
   "errorBaseUrlInvalid": { "message": "Base URL is invalid." },
-  "errorMaxTokensInvalid": { "message": "Max tokens must be a non-negative number (0 = unlimited)." },
+  "errorMaxTokensInvalid": { "message": "Max tokens must be a non-negative integer (0 = unlimited)." },
   "errorTemperatureInvalid": { "message": "Temperature must be between 0 and 2." },
   "errorDebounceInvalid": {
     "message": "Trigger delay must be a non-negative number."

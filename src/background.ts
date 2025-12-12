@@ -333,7 +333,7 @@ async function requestWithResponses(
       }
     ]
   };
-  if (config.maxOutputTokens > 0) {
+  if (Number.isInteger(config.maxOutputTokens) && config.maxOutputTokens > 0) {
     req.max_output_tokens = config.maxOutputTokens;
   }
 
@@ -361,7 +361,7 @@ async function requestWithChat(
       }
     ]
   };
-  if (config.maxOutputTokens > 0) {
+  if (Number.isInteger(config.maxOutputTokens) && config.maxOutputTokens > 0) {
     req.max_tokens = config.maxOutputTokens;
   }
 

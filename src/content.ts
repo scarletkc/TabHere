@@ -92,6 +92,14 @@ type ConfigStorageShape = {
   tabhere_disable_on_sensitive?: boolean;
 };
 
+function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
+  if (typeof value !== "number") return fallback;
+  if (!Number.isFinite(value)) return fallback;
+  if (value < 0) return fallback;
+  if (!Number.isInteger(value)) return fallback;
+  return value;
+}
+
 function storageGet<T>(area: chrome.storage.StorageArea, keys: readonly string[]): Promise<T> {
   return new Promise((resolve) => {
     try {
@@ -117,7 +125,7 @@ async function getConfigLocal(): Promise<TabHereConfig> {
   return {
     model: res.tabhere_model || DEFAULT_CONFIG.model,
     baseUrl: res.tabhere_base_url || DEFAULT_CONFIG.baseUrl,
-    maxOutputTokens: res.tabhere_max_output_tokens ?? DEFAULT_CONFIG.maxOutputTokens,
+    maxOutputTokens: normalizeNonNegativeInteger(res.tabhere_max_output_tokens, DEFAULT_CONFIG.maxOutputTokens),
     temperature: res.tabhere_temperature ?? DEFAULT_CONFIG.temperature,
     debounceMs: res.tabhere_debounce_ms ?? DEFAULT_CONFIG.debounceMs,
     minTriggerChars: res.tabhere_min_trigger_chars ?? DEFAULT_CONFIG.minTriggerChars,
