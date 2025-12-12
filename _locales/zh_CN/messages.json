@@ -15,7 +15,7 @@
   "modelLabel": { "message": "模型 ID" },
   "modelPlaceholder": { "message": "gpt-5.2-mini" },
 
-  "maxTokensLabel": { "message": "最大补全长度（tokens）" },
+  "maxTokensLabel": { "message": "最大补全长度（tokens，0=不限）" },
   "temperatureLabel": { "message": "温度（temperature）" },
 
   "debounceLabel": { "message": "补全触发延迟（ms）" },
@@ -50,7 +50,7 @@
     "message": "API Key 看起来不正确（应以 sk- 开头）。仍然保存吗？"
   },
   "errorBaseUrlInvalid": { "message": "Base URL 无效" },
-  "errorMaxTokensInvalid": { "message": "最大补全长度需为正数" },
+  "errorMaxTokensInvalid": { "message": "最大补全长度需为非负数（0=不限）" },
   "errorTemperatureInvalid": { "message": "温度需在 0~2 之间" },
   "errorDebounceInvalid": { "message": "补全触发延迟需为非负数" },
   "errorMinTriggerInvalid": { "message": "最低触发字数需为非负数" },

@@ -4,7 +4,7 @@ const DEFAULT_CONFIG: TabHereConfig = {
   apiKey: undefined,
   model: "gpt-5.2-mini",
   baseUrl: "https://api.openai.com/v1",
-  maxOutputTokens: 64,
+  maxOutputTokens: 0,
   temperature: 0.2,
   debounceMs: 500,
   minTriggerChars: 3,

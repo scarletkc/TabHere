@@ -122,7 +122,7 @@ saveBtn.addEventListener("click", async () => {
   let maxOutputTokens = DEFAULT_CONFIG.maxOutputTokens;
   if (maxTokensStr) {
     const parsed = Number(maxTokensStr);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
+    if (!Number.isFinite(parsed) || parsed < 0) {
       setStatus(t("errorMaxTokensInvalid"), true);
       return;
     }

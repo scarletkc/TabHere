@@ -319,9 +319,8 @@ async function requestWithResponses(
   config: Awaited<ReturnType<typeof getConfig>>,
   prompt: PromptParts
 ): Promise<string> {
-  const resp = await client.responses.create({
+  const req: any = {
     model: config.model,
-    max_output_tokens: config.maxOutputTokens,
     temperature: config.temperature,
     input: [
       {
@@ -333,7 +332,12 @@ async function requestWithResponses(
         content: prompt.user
       }
     ]
-  });
+  };
+  if (config.maxOutputTokens > 0) {
+    req.max_output_tokens = config.maxOutputTokens;
+  }
+
+  const resp = await client.responses.create(req);
 
   return extractOutputText(resp);
 }
@@ -343,10 +347,9 @@ async function requestWithChat(
   config: Awaited<ReturnType<typeof getConfig>>,
   prompt: PromptParts
 ): Promise<string> {
-  const resp = await client.chat.completions.create({
+  const req: any = {
     model: config.model,
     temperature: config.temperature,
-    max_tokens: config.maxOutputTokens,
     messages: [
       {
         role: "system",
@@ -357,7 +360,12 @@ async function requestWithChat(
         content: prompt.user
       }
     ]
-  });
+  };
+  if (config.maxOutputTokens > 0) {
+    req.max_tokens = config.maxOutputTokens;
+  }
+
+  const resp = await client.chat.completions.create(req);
 
   const text = resp?.choices?.[0]?.message?.content ?? "";
   return String(text);
