@@ -35,6 +35,7 @@ const baseUrlInput = document.getElementById("baseUrl") as HTMLInputElement;
 const modelInput = document.getElementById("model") as HTMLInputElement;
 const maxOutputTokensInput = document.getElementById("maxOutputTokens") as HTMLInputElement;
 const temperatureInput = document.getElementById("temperature") as HTMLInputElement;
+const userInstructionsTextarea = document.getElementById("userInstructions") as HTMLTextAreaElement;
 const debounceMsInput = document.getElementById("debounceMs") as HTMLInputElement;
 const minTriggerCharsInput = document.getElementById("minTriggerChars") as HTMLInputElement;
 const shortcutKeySelect = document.getElementById("shortcutKey") as HTMLSelectElement;
@@ -88,6 +89,7 @@ async function load() {
   modelInput.value = cfg.model;
   maxOutputTokensInput.value = String(cfg.maxOutputTokens);
   temperatureInput.value = String(cfg.temperature);
+  userInstructionsTextarea.value = cfg.userInstructions || "";
   debounceMsInput.value = String(cfg.debounceMs);
   minTriggerCharsInput.value = String(cfg.minTriggerChars);
   shortcutKeySelect.value = cfg.shortcutKey;
@@ -140,6 +142,13 @@ saveBtn.addEventListener("click", async () => {
     temperature = parsed;
   }
 
+  const userInstructionsRaw = userInstructionsTextarea.value;
+  const userInstructions = userInstructionsRaw.trim();
+  if (userInstructions.length > 1000) {
+    setStatus(t("errorUserInstructionsTooLong", "1000"), true);
+    return;
+  }
+
   const debounceStr = debounceMsInput.value.trim();
   let debounceMs = DEFAULT_CONFIG.debounceMs;
   if (debounceStr) {
@@ -170,6 +179,7 @@ saveBtn.addEventListener("click", async () => {
     model: modelInput.value.trim() || DEFAULT_CONFIG.model,
     maxOutputTokens,
     temperature,
+    userInstructions,
     debounceMs,
     minTriggerChars,
     shortcutKey: shortcutKeySelect.value as ShortcutKey,

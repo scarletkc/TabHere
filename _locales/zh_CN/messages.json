@@ -18,6 +18,14 @@
   "maxTokensLabel": { "message": "最大补全长度（tokens，0=不限）" },
   "temperatureLabel": { "message": "温度（temperature）" },
 
+  "userInstructionsLabel": { "message": "个性化偏好/个人信息（可选）" },
+  "userInstructionsPlaceholder": {
+    "message": "示例：\n- 语气：简洁、友好\n- 署名：此致，Alice\n- 使用中文标点"
+  },
+  "userInstructionsHint": {
+    "message": "这段文字会注入到 system prompt，并随请求发送给模型以实现个性化补全/改写。你可以填写个人信息和语气偏好。请不要填写密码、验证码或支付信息等敏感内容。"
+  },
+
   "debounceLabel": { "message": "补全触发延迟（ms）" },
   "minTriggerLabel": { "message": "最低触发字数" },
 
@@ -51,6 +59,7 @@
   },
   "errorBaseUrlInvalid": { "message": "Base URL 无效" },
   "errorMaxTokensInvalid": { "message": "最大补全长度需为非负整数（0=不限）" },
+  "errorUserInstructionsTooLong": { "message": "个性化内容过长（最多 {0} 个字符）" },
   "errorTemperatureInvalid": { "message": "温度需在 0~2 之间" },
   "errorDebounceInvalid": { "message": "补全触发延迟需为非负数" },
   "errorMinTriggerInvalid": { "message": "最低触发字数需为非负数" },

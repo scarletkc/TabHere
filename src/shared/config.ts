@@ -2,6 +2,7 @@ import type { TabHereConfig, ShortcutKey } from "./types";
 
 const DEFAULT_CONFIG: TabHereConfig = {
   apiKey: undefined,
+  userInstructions: "",
   model: "gpt-5-nano",
   baseUrl: "https://api.openai.com/v1",
   maxOutputTokens: 0,
@@ -17,6 +18,7 @@ const DEFAULT_CONFIG: TabHereConfig = {
 
 const CONFIG_KEYS = [
   "tabhere_api_key",
+  "tabhere_user_instructions",
   "tabhere_model",
   "tabhere_base_url",
   "tabhere_max_output_tokens",
@@ -32,6 +34,7 @@ const CONFIG_KEYS = [
 
 type ConfigStorageShape = {
   tabhere_api_key?: string;
+  tabhere_user_instructions?: string;
   tabhere_model?: string;
   tabhere_base_url?: string;
   tabhere_max_output_tokens?: number;
@@ -51,6 +54,13 @@ function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
   if (value < 0) return fallback;
   if (!Number.isInteger(value)) return fallback;
   return value;
+}
+
+function normalizeUserInstructions(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.length > 1000 ? trimmed.slice(0, 1000) : trimmed;
 }
 
 function getStorageArea(useSync: boolean) {
@@ -81,6 +91,7 @@ export async function getConfig(): Promise<TabHereConfig> {
 
   return {
     apiKey: res.tabhere_api_key,
+    userInstructions: normalizeUserInstructions(res.tabhere_user_instructions) || DEFAULT_CONFIG.userInstructions,
     model: res.tabhere_model || DEFAULT_CONFIG.model,
     baseUrl: res.tabhere_base_url || DEFAULT_CONFIG.baseUrl,
     maxOutputTokens: normalizeNonNegativeInteger(res.tabhere_max_output_tokens, DEFAULT_CONFIG.maxOutputTokens),
@@ -99,12 +110,14 @@ export async function saveConfig(partial: Partial<TabHereConfig>): Promise<void>
   const current = await getConfig();
   const next: TabHereConfig = { ...current, ...partial };
   next.maxOutputTokens = normalizeNonNegativeInteger(next.maxOutputTokens, DEFAULT_CONFIG.maxOutputTokens);
+  next.userInstructions = normalizeUserInstructions(next.userInstructions);
 
   await storageSet(chrome.storage.sync, { tabhere_use_sync: next.useSync });
   const storage = getStorageArea(next.useSync);
 
   const toSave: ConfigStorageShape = {
     tabhere_api_key: next.apiKey,
+    tabhere_user_instructions: next.userInstructions,
     tabhere_model: next.model,
     tabhere_base_url: next.baseUrl,
     tabhere_max_output_tokens: next.maxOutputTokens,

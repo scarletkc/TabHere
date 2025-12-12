@@ -51,6 +51,7 @@ chrome.storage.onChanged.addListener(() => {
 
 const DEFAULT_CONFIG: TabHereConfig = {
   apiKey: undefined,
+  userInstructions: "",
   model: "gpt-5-nano",
   baseUrl: "https://api.openai.com/v1",
   maxOutputTokens: 0,
@@ -65,6 +66,7 @@ const DEFAULT_CONFIG: TabHereConfig = {
 };
 
 const CONFIG_KEYS = [
+  "tabhere_user_instructions",
   "tabhere_model",
   "tabhere_base_url",
   "tabhere_max_output_tokens",
@@ -79,6 +81,7 @@ const CONFIG_KEYS = [
 ] as const;
 
 type ConfigStorageShape = {
+  tabhere_user_instructions?: string;
   tabhere_model?: string;
   tabhere_base_url?: string;
   tabhere_max_output_tokens?: number;
@@ -98,6 +101,13 @@ function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
   if (value < 0) return fallback;
   if (!Number.isInteger(value)) return fallback;
   return value;
+}
+
+function normalizeUserInstructions(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.length > 1000 ? trimmed.slice(0, 1000) : trimmed;
 }
 
 function storageGet<T>(area: chrome.storage.StorageArea, keys: readonly string[]): Promise<T> {
@@ -123,6 +133,7 @@ async function getConfigLocal(): Promise<TabHereConfig> {
   const res = await storageGet<ConfigStorageShape>(storage, CONFIG_KEYS);
 
   return {
+    userInstructions: normalizeUserInstructions(res.tabhere_user_instructions) || DEFAULT_CONFIG.userInstructions,
     model: res.tabhere_model || DEFAULT_CONFIG.model,
     baseUrl: res.tabhere_base_url || DEFAULT_CONFIG.baseUrl,
     maxOutputTokens: normalizeNonNegativeInteger(res.tabhere_max_output_tokens, DEFAULT_CONFIG.maxOutputTokens),

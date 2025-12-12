@@ -57,6 +57,8 @@ export type ShortcutKey = "Tab" | "CtrlSpace";
 
 export type TabHereConfig = {
   apiKey?: string;
+  /** 用户个性化偏好/个人信息（可选），会注入到 system prompt */
+  userInstructions: string;
   model: string;
   baseUrl: string;
   maxOutputTokens: number;

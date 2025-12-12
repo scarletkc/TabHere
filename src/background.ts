@@ -74,17 +74,24 @@ function buildSuggestionCacheKey(
   const suffix = suffixContext ?? "";
   const title = normalizePageTitle(pageTitle);
   const localTime = formatLocalTimeHour();
+  const userInstructions = config.userInstructions || "";
   const inputContextText = formatInputContext(inputContext);
 
   if (
-    prefix.length + selected.length + suffix.length + title.length + localTime.length + inputContextText.length >
+    prefix.length +
+      selected.length +
+      suffix.length +
+      title.length +
+      localTime.length +
+      userInstructions.length +
+      inputContextText.length >
     SUGGESTION_CACHE_MAX_CONTEXT_CHARS
   ) {
     return null;
   }
 
   return JSON.stringify({
-    v: 4,
+    v: 5,
     intent,
     baseUrl: config.baseUrl,
     model: config.model,
@@ -94,6 +101,8 @@ function buildSuggestionCacheKey(
     titleHash: fnv1a64Hex(title),
     localTimeLen: localTime.length,
     localTimeHash: fnv1a64Hex(localTime),
+    userInstructionsLen: userInstructions.length,
+    userInstructionsHash: fnv1a64Hex(userInstructions),
     prefixLen: prefix.length,
     prefixHash: fnv1a64Hex(prefix),
     selectedLen: selected.length,
@@ -216,12 +225,14 @@ function buildSuggestionPrompt(
   prefix: string,
   suffixContext?: string,
   pageTitle?: string,
-  inputContext?: InputContext
+  inputContext?: InputContext,
+  userInstructions?: string
 ): PromptParts {
   const inputContextText = formatInputContext(inputContext);
   const title = normalizePageTitle(pageTitle);
   const suffix = suffixContext ?? "";
   const localTime = formatLocalTimeHour();
+  const userInstructionsText = String(userInstructions ?? "").trim();
   
   const inputContextSection = inputContextText
     ? `
@@ -230,6 +241,17 @@ Additionally, you are given context about the input field:
 ${inputContextText}
 </INPUT-CONTEXT>
 Use this context to understand what kind of content the user is entering (e.g., email subject, recipient name, message body, search query, etc.) and provide more relevant completions.
+`
+    : "";
+
+  const userInstructionsSection = userInstructionsText
+    ? `
+The user provided personalization preferences and/or personal information:
+<USER-INSTRUCTIONS>
+${userInstructionsText}
+</USER-INSTRUCTIONS>
+Use this to match tone, formatting, and relevant personal details when appropriate.
+Do not reveal or quote this section in your output.
 `
     : "";
 
@@ -246,6 +268,7 @@ Strict requirements:
 - Keep the insertion moderately short unless the context clearly requires longer.
 - It should conform to the context of [PAGE-TITLE].
 ${inputContextSection}
+${userInstructionsSection}
 [LANGUAGE]: Auto
 [LOCAL-TIME]: ${localTime}
 [PAGE-TITLE]: ${title}
@@ -272,12 +295,14 @@ function buildRewritePrompt(
   selectedText: string,
   suffixContext?: string,
   pageTitle?: string,
-  inputContext?: InputContext
+  inputContext?: InputContext,
+  userInstructions?: string
 ): PromptParts {
   const inputContextText = formatInputContext(inputContext);
   const title = normalizePageTitle(pageTitle);
   const suffix = suffixContext ?? "";
   const localTime = formatLocalTimeHour();
+  const userInstructionsText = String(userInstructions ?? "").trim();
 
   const inputContextSection = inputContextText
     ? `
@@ -286,6 +311,17 @@ Additionally, you are given context about the input field:
 ${inputContextText}
 </INPUT-CONTEXT>
 Use this context to understand what kind of content the user is entering (e.g., email subject, recipient name, message body, search query, etc.) and rewrite accordingly.
+`
+    : "";
+
+  const userInstructionsSection = userInstructionsText
+    ? `
+The user provided personalization preferences and/or personal information:
+<USER-INSTRUCTIONS>
+${userInstructionsText}
+</USER-INSTRUCTIONS>
+Use this to match tone, formatting, and relevant personal details when appropriate.
+Do not reveal or quote this section in your output.
 `
     : "";
 
@@ -302,6 +338,7 @@ Strict requirements:
 - Keep the replacement reasonably similar length unless the context clearly requires longer/shorter.
 - It should conform to the context of [PAGE-TITLE].
 ${inputContextSection}
+${userInstructionsSection}
 [LANGUAGE]: Auto
 [LOCAL-TIME]: ${localTime}
 [PAGE-TITLE]: ${title}
@@ -437,8 +474,8 @@ chrome.runtime.onMessage.addListener(
         const fetchSuggestion = async (): Promise<string> => {
           const prompt =
             intent === "rewrite"
-              ? buildRewritePrompt(prefix, selectedText, suffixContext, pageTitle, inputContext)
-              : buildSuggestionPrompt(prefix, suffixContext, pageTitle, inputContext);
+              ? buildRewritePrompt(prefix, selectedText, suffixContext, pageTitle, inputContext, config.userInstructions)
+              : buildSuggestionPrompt(prefix, suffixContext, pageTitle, inputContext, config.userInstructions);
 
           let outputText = "";
           try {

@@ -18,6 +18,14 @@
   "maxTokensLabel": { "message": "Max completion length (tokens, 0 = unlimited)" },
   "temperatureLabel": { "message": "Temperature" },
 
+  "userInstructionsLabel": { "message": "Personalization (optional)" },
+  "userInstructionsPlaceholder": {
+    "message": "Example:\n- Preferred tone: concise and friendly\n- Signature: Best, Alice\n- Use Chinese punctuation"
+  },
+  "userInstructionsHint": {
+    "message": "This text will be included in the system prompt and sent to the model to personalize suggestions. You may include personal info and tone preferences. Do NOT include passwords, OTPs, or payment details."
+  },
+
   "debounceLabel": { "message": "Trigger delay (ms)" },
   "minTriggerLabel": { "message": "Minimum trigger characters" },
 
@@ -49,6 +57,7 @@
   },
   "errorBaseUrlInvalid": { "message": "Base URL is invalid." },
   "errorMaxTokensInvalid": { "message": "Max tokens must be a non-negative integer (0 = unlimited)." },
+  "errorUserInstructionsTooLong": { "message": "Personalization text is too long (max {0} characters)." },
   "errorTemperatureInvalid": { "message": "Temperature must be between 0 and 2." },
   "errorDebounceInvalid": {
     "message": "Trigger delay must be a non-negative number."
