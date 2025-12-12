@@ -264,7 +264,7 @@ Strict requirements:
 - Output only the insertion text. No explanations, no tags, no quotes, no Markdown fences.
 - Do not repeat or rewrite any part of <PREFIX> or <SUFFIX>.
 - Do not answer questions or add commentary.
-- Match the surrounding language, style, punctuation, and formatting (including newlines).
+- Match the surrounding language, style, punctuation, and formatting (including newlines, spaces).
 - Keep the insertion moderately short unless the context clearly requires longer.
 - It should conform to the context of [PAGE-TITLE].
 ${inputContextSection}
@@ -334,7 +334,7 @@ Strict requirements:
 - Output only the replacement text. No explanations, no tags, no quotes, no Markdown fences.
 - Do not repeat or rewrite any part of <PREFIX> or <SUFFIX>.
 - Preserve the meaning of <SELECTED> unless the surrounding context clearly indicates a correction is needed.
-- Match the surrounding language, style, punctuation, and formatting (including newlines).
+- Match the surrounding language, style, punctuation, and formatting (including newlines, spaces).
 - Keep the replacement reasonably similar length unless the context clearly requires longer/shorter.
 - It should conform to the context of [PAGE-TITLE].
 ${inputContextSection}
