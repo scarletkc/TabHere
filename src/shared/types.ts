@@ -3,6 +3,7 @@ export type SuggestionRequestMessage = {
   requestId: string;
   prefix: string;
   suffixContext?: string;
+  pageTitle?: string;
   cursorOffset?: number;
   languageHint?: string;
   maxOutputTokens?: number;

@@ -334,6 +334,28 @@ function clearSuggestion() {
   overlay.hide();
 }
 
+function getPageTitleForPrompt(): string {
+  const normalize = (title: string): string => {
+    const text = title.replace(/\s+/g, " ").trim();
+    if (!text) return "";
+    return text.length > 120 ? text.slice(0, 120) : text;
+  };
+
+  try {
+    const topTitle = (window.top as Window | null | undefined)?.document?.title;
+    if (typeof topTitle === "string") {
+      const normalized = normalize(topTitle);
+      if (normalized) return normalized;
+    }
+  } catch {
+    // Ignore cross-origin access errors
+  }
+
+  const currentTitle = normalize(document.title || "");
+  if (currentTitle) return currentTitle;
+  return normalize(location.hostname) || "WebInput";
+}
+
 function scheduleSuggest() {
   if (!currentInput || !config) return;
   if (contextInvalidated) return;
@@ -367,6 +389,7 @@ function scheduleSuggest() {
       requestId,
       prefix,
       suffixContext,
+      pageTitle: getPageTitleForPrompt(),
       maxOutputTokens: config.maxOutputTokens
     };
 

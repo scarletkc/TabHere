@@ -39,13 +39,23 @@ function fnv1a64Hex(text: string): string {
   return hash.toString(16).padStart(16, "0");
 }
 
+function normalizePageTitle(pageTitle: string | undefined): string {
+  const text = String(pageTitle ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "WebInput";
+  return text.length > 120 ? text.slice(0, 120) : text;
+}
+
 function buildSuggestionCacheKey(
   config: Awaited<ReturnType<typeof getConfig>>,
   prefix: string,
-  suffixContext?: string
+  suffixContext?: string,
+  pageTitle?: string
 ): string | null {
   const suffix = suffixContext ?? "";
-  if (prefix.length + suffix.length > SUGGESTION_CACHE_MAX_CONTEXT_CHARS) {
+  const title = normalizePageTitle(pageTitle);
+  if (prefix.length + suffix.length + title.length > SUGGESTION_CACHE_MAX_CONTEXT_CHARS) {
     return null;
   }
 
@@ -55,6 +65,8 @@ function buildSuggestionCacheKey(
     model: config.model,
     temperature: config.temperature,
     maxOutputTokens: config.maxOutputTokens,
+    titleLen: title.length,
+    titleHash: fnv1a64Hex(title),
     prefixLen: prefix.length,
     prefixHash: fnv1a64Hex(prefix),
     suffixLen: suffix.length,
@@ -131,23 +143,39 @@ function extractOutputText(resp: any): string {
   return "";
 }
 
-function buildPrompt(prefix: string, suffixContext?: string) {
+function buildPrompt(prefix: string, suffixContext?: string, pageTitle?: string) {
   const system = `
 You are an intelligent input-method completion engine.
-Given a user’s text prefix, output only a natural continuation suffix.
-Do not modify, correct, or repeat the prefix.
-Do not answer questions or add explanations.
-Match the language, style, and tone of the prefix.
-Keep the completion moderately short.
+You will receive the text before and after the cursor (<PREFIX> and <SUFFIX>).
+Your task: output ONLY the text that should be inserted at <CURSOR> so that
+<PREFIX> + your output + <SUFFIX> is coherent and natural.
+Strict requirements:
+- Output only the insertion text. No explanations, no tags, no quotes, no Markdown fences.
+- Do not repeat or rewrite any part of <PREFIX> or <SUFFIX>.
+- Do not answer questions or add commentary.
+- Match the surrounding language, style, punctuation, and formatting (including newlines).
+- Keep the insertion moderately short unless the context clearly requires longer.
+- It conforms to the language of [LANGUAGE] and the context of [PAGE-TITLE].
 `;
+
+  const title = normalizePageTitle(pageTitle);
+  const suffix = suffixContext ?? "";
   const user = [
-    "Provide the completion suffix that follows the given prefix.",
-    `Prefix: ${prefix}`,
-    suffixContext ? `Subsequent context: ${suffixContext}` : "",
-    "Return only the suffix text:"
-  ]
-    .filter(Boolean)
-    .join("\n");
+    "[LANGUAGE]: Auto",
+    `[PAGE-TITLE]: ${title}`,
+    "",
+    "<PREFIX>",
+    prefix,
+    "</PREFIX>",
+    "",
+    "<CURSOR>",
+    "",
+    "<SUFFIX>",
+    suffix,
+    "</SUFFIX>",
+    "",
+    "Please return only what should be inserted at <CURSOR>:"
+  ].join("\n");
   return { system, user };
 }
 
@@ -162,9 +190,10 @@ async function requestSuggestionWithResponses(
   client: OpenAI,
   config: Awaited<ReturnType<typeof getConfig>>,
   prefix: string,
-  suffixContext?: string
+  suffixContext?: string,
+  pageTitle?: string
 ): Promise<string> {
-  const { system, user } = buildPrompt(prefix, suffixContext);
+  const { system, user } = buildPrompt(prefix, suffixContext, pageTitle);
   const resp = await client.responses.create({
     model: config.model,
     max_output_tokens: config.maxOutputTokens,
@@ -188,9 +217,10 @@ async function requestSuggestionWithChat(
   client: OpenAI,
   config: Awaited<ReturnType<typeof getConfig>>,
   prefix: string,
-  suffixContext?: string
+  suffixContext?: string,
+  pageTitle?: string
 ): Promise<string> {
-  const { system, user } = buildPrompt(prefix, suffixContext);
+  const { system, user } = buildPrompt(prefix, suffixContext, pageTitle);
   const resp = await client.chat.completions.create({
     model: config.model,
     temperature: config.temperature,
@@ -221,14 +251,14 @@ chrome.runtime.onMessage.addListener(
       try {
         const config = await getConfig();
         const client = await createOpenAIClient();
-        const { requestId, prefix, suffixContext } = message;
+        const { requestId, prefix, suffixContext, pageTitle } = message;
 
         if (!prefix || !prefix.trim()) {
           sendResponse({ type: "TABHERE_SUGGESTION", requestId, suffix: "" });
           return;
         }
 
-        const cacheKey = buildSuggestionCacheKey(config, prefix, suffixContext);
+        const cacheKey = buildSuggestionCacheKey(config, prefix, suffixContext, pageTitle);
 
         if (cacheKey) {
           const cached = getCachedSuggestion(cacheKey);
@@ -241,10 +271,10 @@ chrome.runtime.onMessage.addListener(
         const fetchSuggestion = async (): Promise<string> => {
           let outputText = "";
           try {
-            outputText = await requestSuggestionWithResponses(client, config, prefix, suffixContext);
+            outputText = await requestSuggestionWithResponses(client, config, prefix, suffixContext, pageTitle);
           } catch (error: any) {
             if (isResponsesUnsupported(error)) {
-              outputText = await requestSuggestionWithChat(client, config, prefix, suffixContext);
+              outputText = await requestSuggestionWithChat(client, config, prefix, suffixContext, pageTitle);
             } else {
               throw error;
             }
