@@ -17,8 +17,14 @@ let contextInvalidated = false;
 /** 缓存的输入框上下文，焦点变化时失效 */
 let cachedInputContext: InputContext | null = null;
 let modifierShortcutPending: "Shift" | "Ctrl" | null = null;
+let cachedPageContentText: string | null = null;
+let cachedPageContentExpiresAt = 0;
+let cachedPageContentRoot: Element | null = null;
 
 const overlay = new SuggestionOverlay();
+
+const MAX_PAGE_CONTENT_CHARS = 1000;
+const PAGE_CONTENT_CACHE_TTL_MS = 10_000;
 
 type RuntimeLike = {
   sendMessage: typeof chrome.runtime.sendMessage;
@@ -746,6 +752,105 @@ function getPageUrlForPrompt(): string {
   return normalize(location.origin || location.hostname) || "unknown";
 }
 
+function extractPageTextSnippet(root: ParentNode, maxChars: number, exclude?: Element | null): string {
+  const SKIP_TAGS = new Set([
+    "SCRIPT",
+    "STYLE",
+    "NOSCRIPT",
+    "TEMPLATE",
+    "INPUT",
+    "TEXTAREA",
+    "SELECT",
+    "OPTION",
+    "BUTTON"
+  ]);
+
+  const acceptNode = (node: Node): number => {
+    const text = node.textContent;
+    if (!text || !text.trim()) return NodeFilter.FILTER_REJECT;
+
+    const parent = (node as any).parentElement as Element | null;
+    if (!parent) return NodeFilter.FILTER_REJECT;
+
+    if (parent.closest?.(`[${OVERLAY_ATTR}]`)) return NodeFilter.FILTER_REJECT;
+    if (SKIP_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+    if (parent.closest?.("[hidden], [aria-hidden='true']")) return NodeFilter.FILTER_REJECT;
+    // 排除当前输入框（尤其是 contenteditable）的内容，避免与 PREFIX/SUFFIX 重复
+    if (exclude && exclude.contains(parent)) return NodeFilter.FILTER_REJECT;
+
+    return NodeFilter.FILTER_ACCEPT;
+  };
+
+  const walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT,
+    { acceptNode } as any
+  );
+
+  let out = "";
+  let truncated = false;
+
+  while (walker.nextNode()) {
+    const raw = walker.currentNode.textContent || "";
+    const cleaned = raw.replace(/\s+/g, " ").trim();
+    if (!cleaned) continue;
+
+    const separator = out ? " " : "";
+    const available = maxChars - out.length - separator.length;
+    if (available <= 0) {
+      truncated = true;
+      break;
+    }
+
+    if (cleaned.length > available) {
+      out += separator + cleaned.slice(0, available);
+      truncated = true;
+      break;
+    }
+
+    out += separator + cleaned;
+  }
+
+  out = out.trim();
+  if (!out) return "";
+
+  if (truncated) {
+    if (maxChars > 1 && out.length >= maxChars) {
+      out = out.slice(0, maxChars - 1) + "…";
+    } else if (out.length < maxChars) {
+      out += "…";
+    }
+  }
+
+  return out.length > maxChars ? out.slice(0, maxChars) : out;
+}
+
+function getPageContentForPrompt(anchor: HTMLElement): string | undefined {
+  const root =
+    anchor.closest("main, article, [role='main']") ||
+    anchor.closest("form, [role='form']") ||
+    document.querySelector("main, article, [role='main']") ||
+    document.body ||
+    document.documentElement;
+
+  const now = Date.now();
+  if (
+    cachedPageContentText &&
+    cachedPageContentExpiresAt > now &&
+    cachedPageContentRoot &&
+    cachedPageContentRoot === root
+  ) {
+    return cachedPageContentText || undefined;
+  }
+
+  const snippet = root ? extractPageTextSnippet(root, MAX_PAGE_CONTENT_CHARS, anchor) : "";
+
+  cachedPageContentText = snippet || "";
+  cachedPageContentExpiresAt = now + PAGE_CONTENT_CACHE_TTL_MS;
+  cachedPageContentRoot = root;
+  return snippet || undefined;
+}
+
 function scheduleSuggest() {
   if (!currentInput || !config) return;
   if (contextInvalidated) return;
@@ -783,6 +888,7 @@ function scheduleSuggest() {
 
     // 获取输入框邻近上下文
     const inputContext = getInputNearbyContext(currentInput);
+    const pageContent = getPageContentForPrompt(currentInput);
 
     const message: SuggestionRequestMessage = hasSelection
       ? {
@@ -793,6 +899,7 @@ function scheduleSuggest() {
           suffixContext,
           pageTitle: getPageTitleForPrompt(),
           pageUrl: getPageUrlForPrompt(),
+          pageContent,
           maxOutputTokens: config.maxOutputTokens,
           inputContext: hasInputContext(inputContext) ? inputContext : undefined
         }
@@ -803,17 +910,20 @@ function scheduleSuggest() {
           suffixContext,
           pageTitle: getPageTitleForPrompt(),
           pageUrl: getPageUrlForPrompt(),
+          pageContent,
           maxOutputTokens: config.maxOutputTokens,
           inputContext: hasInputContext(inputContext) ? inputContext : undefined
         };
 
     if (config.developerDebug) {
       const inputContextText = formatInputContextTextForDebug(message.inputContext);
+      const pageContentText = String(message.pageContent ?? "");
       console.log("[TabHere debug] send request", {
         type: message.type,
         requestId,
         pageTitle: message.pageTitle,
         pageUrl: message.pageUrl,
+        pageContentLen: String(message.pageContent ?? "").length,
         prefixLen: prefix.length,
         selectedLen: selectedText.length,
         suffixContextLen: String(suffixContext ?? "").length,
@@ -822,6 +932,7 @@ function scheduleSuggest() {
       if (inputContextText) {
         console.log("[TabHere debug] inputContextText\n" + inputContextText);
       }
+      console.log("[TabHere debug] pageContent\n" + (pageContentText || "(empty)"));
     }
 
     const runtime = getRuntime();
@@ -835,6 +946,13 @@ function scheduleSuggest() {
           lastFailureAt = Date.now();
           clearSuggestion();
           return;
+        }
+        if (config?.developerDebug) {
+          console.log("[TabHere debug] response", {
+            requestId: res.requestId,
+            suffixLen: String(res.suffix || "").length,
+            suffix: res.suffix || ""
+          });
         }
         currentSuggestionSuffix = res.suffix || "";
         overlay.update(currentInput, currentSuggestionSuffix);

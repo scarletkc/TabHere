@@ -27,6 +27,8 @@ export type SuggestionRequestMessage =
       suffixContext?: string;
       pageTitle?: string;
       pageUrl?: string;
+      /** 页面主体可见文本摘要（可选，截断后） */
+      pageContent?: string;
       cursorOffset?: number;
       languageHint?: string;
       maxOutputTokens?: number;
@@ -41,6 +43,8 @@ export type SuggestionRequestMessage =
       suffixContext?: string;
       pageTitle?: string;
       pageUrl?: string;
+      /** 页面主体可见文本摘要（可选，截断后） */
+      pageContent?: string;
       cursorOffset?: number;
       languageHint?: string;
       maxOutputTokens?: number;

@@ -63,6 +63,14 @@ function normalizePageUrl(pageUrl: string | undefined): string {
   return text.length > 300 ? text.slice(0, 300) : text;
 }
 
+function normalizePageContent(pageContent: string | undefined): string {
+  const text = String(pageContent ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  return text.length > 1000 ? text.slice(0, 1000) : text;
+}
+
 function formatLocalTimeHour(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -83,12 +91,14 @@ function buildSuggestionCacheKey(
   suffixContext?: string,
   pageTitle?: string,
   pageUrl?: string,
+  pageContent?: string,
   inputContext?: InputContext
 ): string | null {
   const selected = selectedText ?? "";
   const suffix = suffixContext ?? "";
   const title = normalizePageTitle(pageTitle);
   const url = normalizePageUrl(pageUrl);
+  const content = normalizePageContent(pageContent);
   const localTime = formatLocalTimeHour();
   const userInstructions = config.userInstructions || "";
   const inputContextText = formatInputContext(inputContext);
@@ -99,6 +109,7 @@ function buildSuggestionCacheKey(
       suffix.length +
       title.length +
       url.length +
+      content.length +
       localTime.length +
       userInstructions.length +
       inputContextText.length >
@@ -108,7 +119,7 @@ function buildSuggestionCacheKey(
   }
 
   return JSON.stringify({
-    v: 6,
+    v: 7,
     intent,
     baseUrl: config.baseUrl,
     model: config.model,
@@ -118,6 +129,8 @@ function buildSuggestionCacheKey(
     titleHash: fnv1a64Hex(title),
     urlLen: url.length,
     urlHash: fnv1a64Hex(url),
+    contentLen: content.length,
+    contentHash: fnv1a64Hex(content),
     localTimeLen: localTime.length,
     localTimeHash: fnv1a64Hex(localTime),
     userInstructionsLen: userInstructions.length,
@@ -245,12 +258,14 @@ function buildSuggestionPrompt(
   suffixContext?: string,
   pageTitle?: string,
   pageUrl?: string,
+  pageContent?: string,
   inputContext?: InputContext,
   userInstructions?: string
 ): PromptParts {
   const inputContextText = formatInputContext(inputContext);
   const title = normalizePageTitle(pageTitle);
   const url = normalizePageUrl(pageUrl);
+  const content = normalizePageContent(pageContent);
   const suffix = suffixContext ?? "";
   const localTime = formatLocalTimeHour();
   const userInstructionsText = String(userInstructions ?? "").trim();
@@ -287,13 +302,14 @@ Strict requirements:
 - Do not answer questions or add commentary.
 - Match the surrounding language, style, punctuation, and formatting (including newlines, spaces).
 - Keep the insertion moderately short unless the context clearly requires longer.
-- It should conform to the context of [PAGE-TITLE] and [PAGE-URL].
+- It should conform to the context of [PAGE-TITLE], [PAGE-URL], and [PAGE-CONTENT].
 ${inputContextSection}
 ${userInstructionsSection}
 [LANGUAGE]: Auto
 [LOCAL-TIME]: ${localTime}
 [PAGE-TITLE]: ${title}
 [PAGE-URL]: ${url}
+[PAGE-CONTENT]: ${content || "(empty)"}
 `;
 
   const user = [
@@ -318,12 +334,14 @@ function buildRewritePrompt(
   suffixContext?: string,
   pageTitle?: string,
   pageUrl?: string,
+  pageContent?: string,
   inputContext?: InputContext,
   userInstructions?: string
 ): PromptParts {
   const inputContextText = formatInputContext(inputContext);
   const title = normalizePageTitle(pageTitle);
   const url = normalizePageUrl(pageUrl);
+  const content = normalizePageContent(pageContent);
   const suffix = suffixContext ?? "";
   const localTime = formatLocalTimeHour();
   const userInstructionsText = String(userInstructions ?? "").trim();
@@ -360,13 +378,14 @@ Strict requirements:
 - Preserve the meaning of <SELECTED> unless the surrounding context clearly indicates a correction is needed.
 - Match the surrounding language, style, punctuation, and formatting (including newlines, spaces).
 - Keep the replacement reasonably similar length unless the context clearly requires longer/shorter.
-- It should conform to the context of [PAGE-TITLE] and [PAGE-URL].
+- It should conform to the context of [PAGE-TITLE], [PAGE-URL], and [PAGE-CONTENT].
 ${inputContextSection}
 ${userInstructionsSection}
 [LANGUAGE]: Auto
 [LOCAL-TIME]: ${localTime}
 [PAGE-TITLE]: ${title}
 [PAGE-URL]: ${url}
+[PAGE-CONTENT]: ${content || "(empty)"}
 `;
 
   const user = [
@@ -544,7 +563,7 @@ chrome.runtime.onMessage.addListener(
       try {
         const config = await getConfig();
         const client = await createOpenAIClient();
-        const { requestId, prefix, suffixContext, pageTitle, pageUrl, inputContext } = message;
+        const { requestId, prefix, suffixContext, pageTitle, pageUrl, pageContent, inputContext } = message;
         const intent: RequestIntent = message.type === "TABHERE_REQUEST_REWRITE" ? "rewrite" : "suggest";
         const selectedText = message.type === "TABHERE_REQUEST_REWRITE" ? message.selectedText : "";
         const developerDebug = Boolean(config.developerDebug);
@@ -567,6 +586,7 @@ chrome.runtime.onMessage.addListener(
             intent,
             pageTitle: normalizePageTitle(pageTitle),
             pageUrl: normalizePageUrl(pageUrl),
+            pageContentLen: normalizePageContent(pageContent).length,
             prefixLen: prefix.length,
             selectedLen: selectedText.length,
             suffixContextLen: String(suffixContext ?? "").length,
@@ -582,6 +602,7 @@ chrome.runtime.onMessage.addListener(
           suffixContext,
           pageTitle,
           pageUrl,
+          pageContent,
           inputContext
         );
 
@@ -599,8 +620,8 @@ chrome.runtime.onMessage.addListener(
         const fetchSuggestion = async (): Promise<string> => {
           const prompt =
             intent === "rewrite"
-              ? buildRewritePrompt(prefix, selectedText, suffixContext, pageTitle, pageUrl, inputContext, config.userInstructions)
-              : buildSuggestionPrompt(prefix, suffixContext, pageTitle, pageUrl, inputContext, config.userInstructions);
+              ? buildRewritePrompt(prefix, selectedText, suffixContext, pageTitle, pageUrl, pageContent, inputContext, config.userInstructions)
+              : buildSuggestionPrompt(prefix, suffixContext, pageTitle, pageUrl, pageContent, inputContext, config.userInstructions);
 
           if (developerDebug) {
             console.log("[TabHere debug] system prompt\n" + prompt.system);
@@ -615,6 +636,10 @@ chrome.runtime.onMessage.addListener(
             } else {
               throw error;
             }
+          }
+
+          if (developerDebug) {
+            console.log("[TabHere debug] model output\n" + String(outputText || "(empty)"));
           }
 
           return outputText;
