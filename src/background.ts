@@ -55,6 +55,14 @@ function normalizePageTitle(pageTitle: string | undefined): string {
   return text.length > 120 ? text.slice(0, 120) : text;
 }
 
+function normalizePageUrl(pageUrl: string | undefined): string {
+  const text = String(pageUrl ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "unknown";
+  return text.length > 300 ? text.slice(0, 300) : text;
+}
+
 function formatLocalTimeHour(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -74,11 +82,13 @@ function buildSuggestionCacheKey(
   selectedText?: string,
   suffixContext?: string,
   pageTitle?: string,
+  pageUrl?: string,
   inputContext?: InputContext
 ): string | null {
   const selected = selectedText ?? "";
   const suffix = suffixContext ?? "";
   const title = normalizePageTitle(pageTitle);
+  const url = normalizePageUrl(pageUrl);
   const localTime = formatLocalTimeHour();
   const userInstructions = config.userInstructions || "";
   const inputContextText = formatInputContext(inputContext);
@@ -88,6 +98,7 @@ function buildSuggestionCacheKey(
       selected.length +
       suffix.length +
       title.length +
+      url.length +
       localTime.length +
       userInstructions.length +
       inputContextText.length >
@@ -97,7 +108,7 @@ function buildSuggestionCacheKey(
   }
 
   return JSON.stringify({
-    v: 5,
+    v: 6,
     intent,
     baseUrl: config.baseUrl,
     model: config.model,
@@ -105,6 +116,8 @@ function buildSuggestionCacheKey(
     maxOutputTokens: config.maxOutputTokens,
     titleLen: title.length,
     titleHash: fnv1a64Hex(title),
+    urlLen: url.length,
+    urlHash: fnv1a64Hex(url),
     localTimeLen: localTime.length,
     localTimeHash: fnv1a64Hex(localTime),
     userInstructionsLen: userInstructions.length,
@@ -231,11 +244,13 @@ function buildSuggestionPrompt(
   prefix: string,
   suffixContext?: string,
   pageTitle?: string,
+  pageUrl?: string,
   inputContext?: InputContext,
   userInstructions?: string
 ): PromptParts {
   const inputContextText = formatInputContext(inputContext);
   const title = normalizePageTitle(pageTitle);
+  const url = normalizePageUrl(pageUrl);
   const suffix = suffixContext ?? "";
   const localTime = formatLocalTimeHour();
   const userInstructionsText = String(userInstructions ?? "").trim();
@@ -272,12 +287,13 @@ Strict requirements:
 - Do not answer questions or add commentary.
 - Match the surrounding language, style, punctuation, and formatting (including newlines, spaces).
 - Keep the insertion moderately short unless the context clearly requires longer.
-- It should conform to the context of [PAGE-TITLE].
+- It should conform to the context of [PAGE-TITLE] and [PAGE-URL].
 ${inputContextSection}
 ${userInstructionsSection}
 [LANGUAGE]: Auto
 [LOCAL-TIME]: ${localTime}
 [PAGE-TITLE]: ${title}
+[PAGE-URL]: ${url}
 `;
 
   const user = [
@@ -301,11 +317,13 @@ function buildRewritePrompt(
   selectedText: string,
   suffixContext?: string,
   pageTitle?: string,
+  pageUrl?: string,
   inputContext?: InputContext,
   userInstructions?: string
 ): PromptParts {
   const inputContextText = formatInputContext(inputContext);
   const title = normalizePageTitle(pageTitle);
+  const url = normalizePageUrl(pageUrl);
   const suffix = suffixContext ?? "";
   const localTime = formatLocalTimeHour();
   const userInstructionsText = String(userInstructions ?? "").trim();
@@ -342,12 +360,13 @@ Strict requirements:
 - Preserve the meaning of <SELECTED> unless the surrounding context clearly indicates a correction is needed.
 - Match the surrounding language, style, punctuation, and formatting (including newlines, spaces).
 - Keep the replacement reasonably similar length unless the context clearly requires longer/shorter.
-- It should conform to the context of [PAGE-TITLE].
+- It should conform to the context of [PAGE-TITLE] and [PAGE-URL].
 ${inputContextSection}
 ${userInstructionsSection}
 [LANGUAGE]: Auto
 [LOCAL-TIME]: ${localTime}
 [PAGE-TITLE]: ${title}
+[PAGE-URL]: ${url}
 `;
 
   const user = [
@@ -525,7 +544,7 @@ chrome.runtime.onMessage.addListener(
       try {
         const config = await getConfig();
         const client = await createOpenAIClient();
-        const { requestId, prefix, suffixContext, pageTitle, inputContext } = message;
+        const { requestId, prefix, suffixContext, pageTitle, pageUrl, inputContext } = message;
         const intent: RequestIntent = message.type === "TABHERE_REQUEST_REWRITE" ? "rewrite" : "suggest";
         const selectedText = message.type === "TABHERE_REQUEST_REWRITE" ? message.selectedText : "";
 
@@ -548,6 +567,7 @@ chrome.runtime.onMessage.addListener(
           selectedText,
           suffixContext,
           pageTitle,
+          pageUrl,
           inputContext
         );
 
@@ -562,8 +582,8 @@ chrome.runtime.onMessage.addListener(
         const fetchSuggestion = async (): Promise<string> => {
           const prompt =
             intent === "rewrite"
-              ? buildRewritePrompt(prefix, selectedText, suffixContext, pageTitle, inputContext, config.userInstructions)
-              : buildSuggestionPrompt(prefix, suffixContext, pageTitle, inputContext, config.userInstructions);
+              ? buildRewritePrompt(prefix, selectedText, suffixContext, pageTitle, pageUrl, inputContext, config.userInstructions)
+              : buildSuggestionPrompt(prefix, suffixContext, pageTitle, pageUrl, inputContext, config.userInstructions);
 
           let outputText = "";
           try {

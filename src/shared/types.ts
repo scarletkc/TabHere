@@ -26,6 +26,7 @@ export type SuggestionRequestMessage =
       prefix: string;
       suffixContext?: string;
       pageTitle?: string;
+      pageUrl?: string;
       cursorOffset?: number;
       languageHint?: string;
       maxOutputTokens?: number;
@@ -39,6 +40,7 @@ export type SuggestionRequestMessage =
       selectedText: string;
       suffixContext?: string;
       pageTitle?: string;
+      pageUrl?: string;
       cursorOffset?: number;
       languageHint?: string;
       maxOutputTokens?: number;

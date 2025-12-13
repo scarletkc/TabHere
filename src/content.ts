@@ -670,6 +670,41 @@ function getPageTitleForPrompt(): string {
   return normalize(location.hostname) || "WebInput";
 }
 
+function getPageUrlForPrompt(): string {
+  const normalize = (href: string): string => {
+    const text = String(href || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) return "";
+
+    try {
+      const url = new URL(text);
+      url.username = "";
+      url.password = "";
+      url.search = "";
+      url.hash = "";
+      const normalized = url.toString();
+      return normalized.length > 300 ? normalized.slice(0, 300) : normalized;
+    } catch {
+      return text.length > 300 ? text.slice(0, 300) : text;
+    }
+  };
+
+  try {
+    const topHref = (window.top as Window | null | undefined)?.location?.href;
+    if (typeof topHref === "string") {
+      const normalized = normalize(topHref);
+      if (normalized) return normalized;
+    }
+  } catch {
+    // Ignore cross-origin access errors
+  }
+
+  const currentHref = normalize(location.href || "");
+  if (currentHref) return currentHref;
+  return normalize(location.origin || location.hostname) || "unknown";
+}
+
 function scheduleSuggest() {
   if (!currentInput || !config) return;
   if (contextInvalidated) return;
@@ -716,6 +751,7 @@ function scheduleSuggest() {
           selectedText,
           suffixContext,
           pageTitle: getPageTitleForPrompt(),
+          pageUrl: getPageUrlForPrompt(),
           maxOutputTokens: config.maxOutputTokens,
           inputContext: hasInputContext(inputContext) ? inputContext : undefined
         }
@@ -725,6 +761,7 @@ function scheduleSuggest() {
           prefix,
           suffixContext,
           pageTitle: getPageTitleForPrompt(),
+          pageUrl: getPageUrlForPrompt(),
           maxOutputTokens: config.maxOutputTokens,
           inputContext: hasInputContext(inputContext) ? inputContext : undefined
         };
