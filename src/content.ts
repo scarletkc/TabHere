@@ -63,7 +63,8 @@ const DEFAULT_CONFIG: TabHereConfig = {
   useSync: true,
   disabledSites: [],
   enabledSites: [],
-  disableOnSensitive: true
+  disableOnSensitive: true,
+  developerDebug: false
 };
 
 const SHORTCUT_KEYS = ["Tab", "Shift", "Ctrl"] as const satisfies readonly TabHereConfig["shortcutKey"][];
@@ -88,7 +89,8 @@ const CONFIG_KEYS = [
   "tabhere_use_sync",
   "tabhere_disabled_sites",
   "tabhere_enabled_sites",
-  "tabhere_disable_on_sensitive"
+  "tabhere_disable_on_sensitive",
+  "tabhere_developer_debug"
 ] as const;
 
 type ConfigStorageShape = {
@@ -104,6 +106,7 @@ type ConfigStorageShape = {
   tabhere_disabled_sites?: string[];
   tabhere_enabled_sites?: string[];
   tabhere_disable_on_sensitive?: boolean;
+  tabhere_developer_debug?: boolean;
 };
 
 function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
@@ -155,7 +158,8 @@ async function getConfigLocal(): Promise<TabHereConfig> {
     useSync,
     disabledSites: res.tabhere_disabled_sites ?? DEFAULT_CONFIG.disabledSites,
     enabledSites: res.tabhere_enabled_sites ?? DEFAULT_CONFIG.enabledSites,
-    disableOnSensitive: res.tabhere_disable_on_sensitive ?? DEFAULT_CONFIG.disableOnSensitive
+    disableOnSensitive: res.tabhere_disable_on_sensitive ?? DEFAULT_CONFIG.disableOnSensitive,
+    developerDebug: res.tabhere_developer_debug ?? DEFAULT_CONFIG.developerDebug
   };
 }
 
@@ -576,6 +580,22 @@ function hasInputContext(ctx: InputContext): boolean {
   );
 }
 
+function formatInputContextTextForDebug(inputContext?: InputContext): string {
+  if (!inputContext) return "";
+
+  const parts: string[] = [];
+
+  if (inputContext.label) parts.push(`Label: ${inputContext.label}`);
+  if (inputContext.placeholder) parts.push(`Placeholder: ${inputContext.placeholder}`);
+  if (inputContext.ariaLabel) parts.push(`Aria-label: ${inputContext.ariaLabel}`);
+  if (inputContext.ariaDescription) parts.push(`Description: ${inputContext.ariaDescription}`);
+  if (inputContext.fieldName) parts.push(`Field name: ${inputContext.fieldName}`);
+  if (inputContext.nearbyHeading) parts.push(`Section: ${inputContext.nearbyHeading}`);
+  if (inputContext.nearbyText) parts.push(`Nearby text: ${inputContext.nearbyText}`);
+
+  return parts.length > 0 ? parts.join("\n") : "";
+}
+
 function applySuggestion(el: HTMLElement, suffix: string) {
   if (!suffix) return;
   if (el.isContentEditable) {
@@ -765,6 +785,23 @@ function scheduleSuggest() {
           maxOutputTokens: config.maxOutputTokens,
           inputContext: hasInputContext(inputContext) ? inputContext : undefined
         };
+
+    if (config.developerDebug) {
+      const inputContextText = formatInputContextTextForDebug(message.inputContext);
+      console.log("[TabHere debug] send request", {
+        type: message.type,
+        requestId,
+        pageTitle: message.pageTitle,
+        pageUrl: message.pageUrl,
+        prefixLen: prefix.length,
+        selectedLen: selectedText.length,
+        suffixContextLen: String(suffixContext ?? "").length,
+        inputContextText: inputContextText || "(empty)"
+      });
+      if (inputContextText) {
+        console.log("[TabHere debug] inputContextText\n" + inputContextText);
+      }
+    }
 
     const runtime = getRuntime();
     if (!runtime) {

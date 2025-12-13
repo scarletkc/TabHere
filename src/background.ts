@@ -547,6 +547,7 @@ chrome.runtime.onMessage.addListener(
         const { requestId, prefix, suffixContext, pageTitle, pageUrl, inputContext } = message;
         const intent: RequestIntent = message.type === "TABHERE_REQUEST_REWRITE" ? "rewrite" : "suggest";
         const selectedText = message.type === "TABHERE_REQUEST_REWRITE" ? message.selectedText : "";
+        const developerDebug = Boolean(config.developerDebug);
 
         if (intent === "rewrite") {
           if (!selectedText || !selectedText.trim()) {
@@ -558,6 +559,19 @@ chrome.runtime.onMessage.addListener(
             sendResponse({ type: "TABHERE_SUGGESTION", requestId, suffix: "" });
             return;
           }
+        }
+
+        if (developerDebug) {
+          const inputContextText = formatInputContext(inputContext);
+          console.log("[TabHere debug] request", {
+            intent,
+            pageTitle: normalizePageTitle(pageTitle),
+            pageUrl: normalizePageUrl(pageUrl),
+            prefixLen: prefix.length,
+            selectedLen: selectedText.length,
+            suffixContextLen: String(suffixContext ?? "").length,
+            inputContextText: inputContextText || "(empty)"
+          });
         }
 
         const cacheKey = buildSuggestionCacheKey(
@@ -574,6 +588,9 @@ chrome.runtime.onMessage.addListener(
         if (cacheKey) {
           const cached = getCachedSuggestion(cacheKey);
           if (cached !== null) {
+            if (developerDebug) {
+              console.log("[TabHere debug] cache hit");
+            }
             sendResponse({ type: "TABHERE_SUGGESTION", requestId, suffix: cached });
             return;
           }
@@ -584,6 +601,10 @@ chrome.runtime.onMessage.addListener(
             intent === "rewrite"
               ? buildRewritePrompt(prefix, selectedText, suffixContext, pageTitle, pageUrl, inputContext, config.userInstructions)
               : buildSuggestionPrompt(prefix, suffixContext, pageTitle, pageUrl, inputContext, config.userInstructions);
+
+          if (developerDebug) {
+            console.log("[TabHere debug] system prompt\n" + prompt.system);
+          }
 
           let outputText = "";
           try {

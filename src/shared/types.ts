@@ -85,4 +85,6 @@ export type TabHereConfig = {
   disabledSites: string[];
   enabledSites: string[];
   disableOnSensitive: boolean;
+  /** 开发者调试模式：在控制台输出调试信息 */
+  developerDebug: boolean;
 };

@@ -39,6 +39,7 @@
 
   "useSyncLabel": { "message": "同步设置与 API Key（chrome.storage.sync）" },
   "disableSensitiveLabel": { "message": "在敏感输入框禁用（如密码/验证码）" },
+  "developerDebugLabel": { "message": "开发者调试模式（开启后在控制台输出信息用于调试）" },
 
   "enabledSitesLabel": {
     "message": "站点白名单（逗号或换行分隔，留空表示全站启用）"

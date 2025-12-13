@@ -41,6 +41,7 @@ const minTriggerCharsInput = document.getElementById("minTriggerChars") as HTMLI
 const shortcutKeySelect = document.getElementById("shortcutKey") as HTMLSelectElement;
 const useSyncCheckbox = document.getElementById("useSync") as HTMLInputElement;
 const disableOnSensitiveCheckbox = document.getElementById("disableOnSensitive") as HTMLInputElement;
+const developerDebugCheckbox = document.getElementById("developerDebug") as HTMLInputElement;
 const enabledSitesTextarea = document.getElementById("enabledSites") as HTMLTextAreaElement;
 const disabledSitesTextarea = document.getElementById("disabledSites") as HTMLTextAreaElement;
 const saveBtn = document.getElementById("save") as HTMLButtonElement;
@@ -96,6 +97,7 @@ async function load() {
   shortcutKeySelect.value = cfg.shortcutKey;
   useSyncCheckbox.checked = cfg.useSync;
   disableOnSensitiveCheckbox.checked = cfg.disableOnSensitive;
+  developerDebugCheckbox.checked = cfg.developerDebug;
   enabledSitesTextarea.value = cfg.enabledSites.join("\n");
   disabledSitesTextarea.value = cfg.disabledSites.join("\n");
 }
@@ -186,6 +188,7 @@ saveBtn.addEventListener("click", async () => {
     shortcutKey: shortcutKeySelect.value as ShortcutKey,
     useSync: useSyncCheckbox.checked,
     disableOnSensitive: disableOnSensitiveCheckbox.checked,
+    developerDebug: developerDebugCheckbox.checked,
     enabledSites: parseSites(enabledSitesTextarea.value),
     disabledSites: parseSites(disabledSitesTextarea.value)
   };

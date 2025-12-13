@@ -13,7 +13,8 @@ const DEFAULT_CONFIG: TabHereConfig = {
   useSync: true,
   disabledSites: [],
   enabledSites: [],
-  disableOnSensitive: true
+  disableOnSensitive: true,
+  developerDebug: false
 };
 
 const SHORTCUT_KEYS = ["Tab", "Shift", "Ctrl"] as const satisfies readonly ShortcutKey[];
@@ -36,7 +37,8 @@ const CONFIG_KEYS = [
   "tabhere_use_sync",
   "tabhere_disabled_sites",
   "tabhere_enabled_sites",
-  "tabhere_disable_on_sensitive"
+  "tabhere_disable_on_sensitive",
+  "tabhere_developer_debug"
 ] as const;
 
 type ConfigStorageShape = {
@@ -53,6 +55,7 @@ type ConfigStorageShape = {
   tabhere_disabled_sites?: string[];
   tabhere_enabled_sites?: string[];
   tabhere_disable_on_sensitive?: boolean;
+  tabhere_developer_debug?: boolean;
 };
 
 function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
@@ -109,7 +112,8 @@ export async function getConfig(): Promise<TabHereConfig> {
     useSync,
     disabledSites: res.tabhere_disabled_sites ?? DEFAULT_CONFIG.disabledSites,
     enabledSites: res.tabhere_enabled_sites ?? DEFAULT_CONFIG.enabledSites,
-    disableOnSensitive: res.tabhere_disable_on_sensitive ?? DEFAULT_CONFIG.disableOnSensitive
+    disableOnSensitive: res.tabhere_disable_on_sensitive ?? DEFAULT_CONFIG.disableOnSensitive,
+    developerDebug: res.tabhere_developer_debug ?? DEFAULT_CONFIG.developerDebug
   };
 }
 
@@ -134,7 +138,8 @@ export async function saveConfig(partial: Partial<TabHereConfig>): Promise<void>
     tabhere_shortcut_key: next.shortcutKey,
     tabhere_disabled_sites: next.disabledSites,
     tabhere_enabled_sites: next.enabledSites,
-    tabhere_disable_on_sensitive: next.disableOnSensitive
+    tabhere_disable_on_sensitive: next.disableOnSensitive,
+    tabhere_developer_debug: next.developerDebug
   };
 
   await storageSet(storage, toSave as Record<string, any>);

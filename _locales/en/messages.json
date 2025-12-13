@@ -39,6 +39,7 @@
 
   "useSyncLabel": { "message": "Sync settings & API key (chrome.storage.sync)" },
   "disableSensitiveLabel": { "message": "Disable on sensitive inputs (password/OTP)" },
+  "developerDebugLabel": { "message": "Developer debug mode (logs to the console)" },
 
   "enabledSitesLabel": {
     "message": "Allowed sites (comma/newline separated, empty = all sites)"
