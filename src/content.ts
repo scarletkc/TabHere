@@ -25,6 +25,7 @@ const overlay = new SuggestionOverlay();
 
 const MAX_PAGE_CONTENT_CHARS = 1000;
 const PAGE_CONTENT_CACHE_TTL_MS = 10_000;
+const NO_SUGGESTION_TOKEN = "<NO_SUGGESTION>";
 
 type RuntimeLike = {
   sendMessage: typeof chrome.runtime.sendMessage;
@@ -623,6 +624,14 @@ function formatInputContextTextForDebug(inputContext?: InputContext): string {
   return parts.length > 0 ? parts.join("\n") : "";
 }
 
+function normalizeModelSuffix(text: unknown): string {
+  const raw = String(text ?? "");
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (trimmed === NO_SUGGESTION_TOKEN) return "";
+  return raw;
+}
+
 function applySuggestion(el: HTMLElement, suffix: string) {
   if (!suffix) return;
   if (el.isContentEditable) {
@@ -947,14 +956,17 @@ function scheduleSuggest() {
           clearSuggestion();
           return;
         }
+        const normalizedSuffix = normalizeModelSuffix(res.suffix);
         if (config?.developerDebug) {
           console.log("[TabHere debug] response", {
             requestId: res.requestId,
             suffixLen: String(res.suffix || "").length,
-            suffix: res.suffix || ""
+            suffix: res.suffix || "",
+            normalizedSuffixLen: normalizedSuffix.length,
+            normalizedSuffix: normalizedSuffix || ""
           });
         }
-        currentSuggestionSuffix = res.suffix || "";
+        currentSuggestionSuffix = normalizedSuffix;
         overlay.update(currentInput, currentSuggestionSuffix);
       });
     } catch (error) {

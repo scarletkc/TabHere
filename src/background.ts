@@ -24,6 +24,7 @@ type SuggestionCacheEntry = {
 const SUGGESTION_CACHE_MAX_ENTRIES = 200;
 const SUGGESTION_CACHE_TTL_MS = 30_000;
 const SUGGESTION_CACHE_MAX_CONTEXT_CHARS = 4096;
+const NO_SUGGESTION_TOKEN = "<NO_SUGGESTION>";
 
 const suggestionCache = new Map<string, SuggestionCacheEntry>();
 const inflightSuggestions = new Map<string, Promise<string>>();
@@ -119,7 +120,7 @@ function buildSuggestionCacheKey(
   }
 
   return JSON.stringify({
-    v: 7,
+    v: 8,
     intent,
     baseUrl: config.baseUrl,
     model: config.model,
@@ -215,6 +216,15 @@ function extractOutputText(resp: any): string {
   return "";
 }
 
+function normalizeModelOutput(text: string, intent: RequestIntent, selectedText?: string): string {
+  const raw = String(text ?? "");
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (trimmed === NO_SUGGESTION_TOKEN) return "";
+  if (intent === "rewrite" && raw === String(selectedText ?? "")) return "";
+  return raw;
+}
+
 /**
  * 将 InputContext 格式化为提示词中的上下文描述
  */
@@ -297,7 +307,9 @@ Your task: output ONLY the text that should be inserted at <CURSOR> so that
 <PREFIX> + your output + <SUFFIX> is coherent and natural.
 
 Strict requirements:
-- Output only the insertion text. No explanations, no tags, no quotes, no Markdown fences.
+- Output only the insertion text. No explanations, no quotes, no Markdown fences. 
+- If no insertion is needed, output exactly <NO_SUGGESTION> (including angle brackets) and nothing else.
+- Do not output any tags except the literal <NO_SUGGESTION> token when no insertion is needed.
 - Do not repeat or rewrite any part of <PREFIX> or <SUFFIX>.
 - Do not answer questions or add commentary.
 - Match the surrounding language, style, punctuation, and formatting (including newlines, spaces).
@@ -373,7 +385,9 @@ Your task: output ONLY the rewritten replacement text for <SELECTED> so that
 <PREFIX> + your output + <SUFFIX> is coherent and natural.
 
 Strict requirements:
-- Output only the replacement text. No explanations, no tags, no quotes, no Markdown fences.
+- Output only the replacement text. No explanations, no quotes, no Markdown fences.
+- If no rewrite is needed, output exactly <NO_SUGGESTION> (including angle brackets) and nothing else.
+- Do not output any tags except the literal <NO_SUGGESTION> token when no rewrite is needed.
 - Do not repeat or rewrite any part of <PREFIX> or <SUFFIX>.
 - Preserve the meaning of <SELECTED> unless the surrounding context clearly indicates a correction is needed.
 - Match the surrounding language, style, punctuation, and formatting (including newlines, spaces).
@@ -638,11 +652,16 @@ chrome.runtime.onMessage.addListener(
             }
           }
 
+          const normalized = normalizeModelOutput(outputText, intent, selectedText);
+
           if (developerDebug) {
             console.log("[TabHere debug] model output\n" + String(outputText || "(empty)"));
+            if (normalized !== outputText) {
+              console.log("[TabHere debug] normalized output\n" + String(normalized || "(empty)"));
+            }
           }
 
-          return outputText;
+          return normalized;
         };
 
         let outputText = "";
