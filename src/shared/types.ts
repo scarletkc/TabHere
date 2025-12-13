@@ -53,6 +53,19 @@ export type SuggestionResponseMessage = {
   error?: string;
 };
 
+export type TestApiRequestMessage = {
+  type: "TABHERE_TEST_API";
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+};
+
+export type TestApiResponseMessage = {
+  type: "TABHERE_TEST_API_RESULT";
+  ok: boolean;
+  message?: string;
+};
+
 export type ShortcutKey = "Tab" | "Shift" | "Ctrl";
 
 export type TabHereConfig = {

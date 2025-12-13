@@ -48,7 +48,11 @@
   },
 
   "saveButtonLabel": { "message": "Save" },
+  "testApiButtonLabel": { "message": "Test API" },
   "statusSaved": { "message": "Saved" },
+  "statusApiTesting": { "message": "Testing..." },
+  "statusApiTestOk": { "message": "API settings look good." },
+  "statusApiTestFailed": { "message": "Test failed: $1" },
   "openSourceLink": { "message": "Open-source on GitHub (MIT License)" },
   "versionPrefix": { "message": "Version" },
 
@@ -58,7 +62,7 @@
   },
   "errorBaseUrlInvalid": { "message": "Base URL is invalid." },
   "errorMaxTokensInvalid": { "message": "Max tokens must be a non-negative integer (0 = unlimited)." },
-  "errorUserInstructionsTooLong": { "message": "Personalization text is too long (max {0} characters)." },
+  "errorUserInstructionsTooLong": { "message": "Personalization text is too long (max $1 characters)." },
   "errorTemperatureInvalid": { "message": "Temperature must be between 0 and 2." },
   "errorDebounceInvalid": {
     "message": "Trigger delay must be a non-negative number."

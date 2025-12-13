@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG, getConfig, saveConfig } from "../shared/config";
-import type { ShortcutKey } from "../shared/types";
+import type { ShortcutKey, TestApiRequestMessage, TestApiResponseMessage } from "../shared/types";
 
 function t(key: string, substitutions?: string | string[]) {
   const msg = chrome.i18n.getMessage(key, substitutions);
@@ -44,6 +44,7 @@ const disableOnSensitiveCheckbox = document.getElementById("disableOnSensitive")
 const enabledSitesTextarea = document.getElementById("enabledSites") as HTMLTextAreaElement;
 const disabledSitesTextarea = document.getElementById("disabledSites") as HTMLTextAreaElement;
 const saveBtn = document.getElementById("save") as HTMLButtonElement;
+const testApiBtn = document.getElementById("testApi") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLSpanElement;
 const versionEl = document.getElementById("version") as HTMLDivElement | null;
 
@@ -201,4 +202,71 @@ saveBtn.addEventListener("click", async () => {
 
 load().catch((e) => {
   console.error("Failed to load TabHere config", e);
+});
+
+testApiBtn.addEventListener("click", async () => {
+  setStatus("");
+  testApiBtn.disabled = true;
+
+  try {
+    const apiKey = apiKeyInput.value.trim();
+    if (!apiKey) {
+      setStatus(t("errorApiKeyEmpty"), true);
+      return;
+    }
+    if (!apiKey.startsWith("sk-")) {
+      const proceed = confirm(t("confirmApiKeyInvalid"));
+      if (!proceed) return;
+    }
+
+    const baseUrl = baseUrlInput.value.trim() || DEFAULT_CONFIG.baseUrl;
+    try {
+      new URL(baseUrl);
+    } catch {
+      setStatus(t("errorBaseUrlInvalid"), true);
+      return;
+    }
+
+    const model = modelInput.value.trim() || DEFAULT_CONFIG.model;
+
+    await ensureOptionalHostPermission(baseUrl);
+
+    setStatus(t("statusApiTesting"));
+
+    const message: TestApiRequestMessage = {
+      type: "TABHERE_TEST_API",
+      apiKey,
+      baseUrl,
+      model
+    };
+
+    const res = await new Promise<TestApiResponseMessage>((resolve) => {
+      chrome.runtime.sendMessage(message, (response: TestApiResponseMessage) => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          resolve({ type: "TABHERE_TEST_API_RESULT", ok: false, message: err.message || "Unknown error" });
+          return;
+        }
+        resolve(response);
+      });
+    });
+
+    if (res?.type !== "TABHERE_TEST_API_RESULT") {
+      setStatus(t("statusApiTestFailed", "Unexpected response"), true);
+      return;
+    }
+
+    if (res.ok) {
+      setStatus(t("statusApiTestOk"));
+      setTimeout(() => setStatus(""), 4000);
+      return;
+    }
+
+    setStatus(t("statusApiTestFailed", res.message || "Unknown error"), true);
+  } catch (error: any) {
+    console.error("API test failed", error);
+    setStatus(t("statusApiTestFailed", error?.message || "Unknown error"), true);
+  } finally {
+    testApiBtn.disabled = false;
+  }
 });

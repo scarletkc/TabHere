@@ -1,6 +1,12 @@
 import OpenAI from "openai";
 import { getConfig } from "./shared/config";
-import type { InputContext, SuggestionRequestMessage, SuggestionResponseMessage } from "./shared/types";
+import type {
+  InputContext,
+  SuggestionRequestMessage,
+  SuggestionResponseMessage,
+  TestApiRequestMessage,
+  TestApiResponseMessage
+} from "./shared/types";
 
 type ClientCache = {
   apiKey?: string;
@@ -370,6 +376,67 @@ function isResponsesUnsupported(error: any): boolean {
   return message.includes("not found") && message.includes("404");
 }
 
+function describeApiTestError(error: any): string {
+  const status = error?.status ?? error?.response?.status;
+  const rawMessage = String(error?.message || error?.error?.message || "").trim();
+
+  if (rawMessage === "NO_API_KEY") return "Missing API key";
+
+  if (status === 401) return "Unauthorized (check API key)";
+  if (status === 403) return "Forbidden (key has no access)";
+  if (status === 404) return "Not found (check Base URL and model)";
+  if (status === 429) return "Rate limited or quota exceeded";
+  if (status === 400) return "Bad request (check model/Base URL)";
+
+  const lower = rawMessage.toLowerCase();
+  if (lower.includes("failed to fetch") || lower.includes("networkerror")) {
+    return "Network error (check Base URL and connectivity)";
+  }
+
+  if (status) {
+    return `Request failed (HTTP ${status})${rawMessage ? `: ${rawMessage}` : ""}`;
+  }
+
+  return rawMessage || "Unknown error";
+}
+
+async function testApiConfig(apiKey: string, baseUrl: string, model: string) {
+  const client = new OpenAI({
+    apiKey,
+    baseURL: baseUrl,
+    dangerouslyAllowBrowser: true
+  });
+
+  try {
+    await client.models.retrieve(model);
+    return;
+  } catch (error: any) {
+    const status = error?.status ?? error?.response?.status;
+    if (status && status !== 404 && status !== 405) {
+      throw error;
+    }
+  }
+
+  try {
+    await client.responses.create({
+      model,
+      input: [{ role: "user", content: "ping" }],
+      max_output_tokens: 1
+    } as any);
+    return;
+  } catch (error: any) {
+    if (!isResponsesUnsupported(error)) {
+      throw error;
+    }
+  }
+
+  await client.chat.completions.create({
+    model,
+    messages: [{ role: "user", content: "ping" }],
+    max_tokens: 1
+  } as any);
+}
+
 async function requestWithResponses(
   client: OpenAI,
   config: Awaited<ReturnType<typeof getConfig>>,
@@ -428,7 +495,28 @@ async function requestWithChat(
 }
 
 chrome.runtime.onMessage.addListener(
-  (message: SuggestionRequestMessage, _sender, sendResponse: (res: SuggestionResponseMessage) => void) => {
+  (
+    message: SuggestionRequestMessage | TestApiRequestMessage,
+    _sender,
+    sendResponse: (res: SuggestionResponseMessage | TestApiResponseMessage) => void
+  ) => {
+    if (message?.type === "TABHERE_TEST_API") {
+      (async () => {
+        try {
+          const { apiKey, baseUrl, model } = message;
+          if (!apiKey) {
+            sendResponse({ type: "TABHERE_TEST_API_RESULT", ok: false, message: "Missing API key" });
+            return;
+          }
+          await testApiConfig(apiKey, baseUrl, model);
+          sendResponse({ type: "TABHERE_TEST_API_RESULT", ok: true });
+        } catch (error: any) {
+          sendResponse({ type: "TABHERE_TEST_API_RESULT", ok: false, message: describeApiTestError(error) });
+        }
+      })();
+      return true;
+    }
+
     if (message?.type !== "TABHERE_REQUEST_SUGGESTION" && message?.type !== "TABHERE_REQUEST_REWRITE") {
       return;
     }

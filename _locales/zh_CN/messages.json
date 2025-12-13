@@ -50,7 +50,11 @@
   },
 
   "saveButtonLabel": { "message": "保存设置" },
+  "testApiButtonLabel": { "message": "测试 API" },
   "statusSaved": { "message": "已保存" },
+  "statusApiTesting": { "message": "正在测试..." },
+  "statusApiTestOk": { "message": "API 配置可用" },
+  "statusApiTestFailed": { "message": "测试失败：$1" },
   "openSourceLink": { "message": "在 GitHub 以 MIT 许可证开源" },
   "versionPrefix": { "message": "版本" },
 
@@ -60,7 +64,7 @@
   },
   "errorBaseUrlInvalid": { "message": "Base URL 无效" },
   "errorMaxTokensInvalid": { "message": "最大补全长度需为非负整数（0=不限）" },
-  "errorUserInstructionsTooLong": { "message": "个性化内容过长（最多 {0} 个字符）" },
+  "errorUserInstructionsTooLong": { "message": "个性化内容过长（最多 $1 个字符）" },
   "errorTemperatureInvalid": { "message": "温度需在 0~2 之间" },
   "errorDebounceInvalid": { "message": "补全触发延迟需为非负数" },
   "errorMinTriggerInvalid": { "message": "最低触发字数需为非负数" },

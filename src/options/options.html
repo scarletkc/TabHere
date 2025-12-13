@@ -51,13 +51,17 @@
         gap: 8px;
       }
       button {
-        margin-top: 16px;
         padding: 8px 14px;
         font-size: 14px;
         cursor: pointer;
       }
+      .actions {
+        margin-top: 16px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
       #status {
-        margin-left: 12px;
         font-size: 13px;
         color: #0a7;
       }
@@ -168,8 +172,11 @@
       </label>
     </div>
 
-    <button id="save" type="button" data-i18n="saveButtonLabel">Save</button>
-    <span id="status"></span>
+    <div class="actions">
+      <button id="save" type="button" data-i18n="saveButtonLabel">Save</button>
+      <button id="testApi" type="button" data-i18n="testApiButtonLabel">Test API</button>
+      <span id="status"></span>
+    </div>
 
     <div class="footer">
       <a
