@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { getConfig } from "./shared/config";
+import { EMPTY_PLACEHOLDER, formatInputContextText, NO_SUGGESTION_TOKEN } from "./shared/promptUtils";
 import type {
   InputContext,
   SuggestionRequestMessage,
@@ -24,7 +25,6 @@ type SuggestionCacheEntry = {
 const SUGGESTION_CACHE_MAX_ENTRIES = 200;
 const SUGGESTION_CACHE_TTL_MS = 30_000;
 const SUGGESTION_CACHE_MAX_CONTEXT_CHARS = 4096;
-const NO_SUGGESTION_TOKEN = "<NO_SUGGESTION>";
 
 const suggestionCache = new Map<string, SuggestionCacheEntry>();
 const inflightSuggestions = new Map<string, Promise<string>>();
@@ -102,7 +102,7 @@ function buildSuggestionCacheKey(
   const content = normalizePageContent(pageContent);
   const localTime = formatLocalTimeHour();
   const userInstructions = config.userInstructions || "";
-  const inputContextText = formatInputContext(inputContext);
+  const inputContextText = formatInputContextText(inputContext);
 
   if (
     prefix.length +
@@ -225,43 +225,39 @@ function normalizeModelOutput(text: string, intent: RequestIntent, selectedText?
   return raw;
 }
 
-/**
- * 将 InputContext 格式化为提示词中的上下文描述
- */
-function formatInputContext(inputContext?: InputContext): string {
-  if (!inputContext) return "";
-
-  const parts: string[] = [];
-
-  if (inputContext.label) {
-    parts.push(`Label: ${inputContext.label}`);
-  }
-  if (inputContext.placeholder) {
-    parts.push(`Placeholder: ${inputContext.placeholder}`);
-  }
-  if (inputContext.ariaLabel) {
-    parts.push(`Aria-label: ${inputContext.ariaLabel}`);
-  }
-  if (inputContext.ariaDescription) {
-    parts.push(`Description: ${inputContext.ariaDescription}`);
-  }
-  if (inputContext.fieldName) {
-    parts.push(`Field name: ${inputContext.fieldName}`);
-  }
-  if (inputContext.nearbyHeading) {
-    parts.push(`Section: ${inputContext.nearbyHeading}`);
-  }
-  if (inputContext.nearbyText) {
-    parts.push(`Nearby text: ${inputContext.nearbyText}`);
-  }
-
-  return parts.length > 0 ? parts.join("\n") : "";
-}
-
 type PromptParts = {
   system: string;
   user: string;
 };
+
+function buildInputContextSection(inputContextText: string, intent: RequestIntent): string {
+  if (!inputContextText) return "";
+
+  const tail =
+    intent === "rewrite"
+      ? "rewrite accordingly."
+      : "provide more relevant completions.";
+
+  return `
+Additionally, you are given context about the input field:
+<INPUT-CONTEXT>
+${inputContextText}
+</INPUT-CONTEXT>
+Use this context to understand what kind of content the user is entering (e.g., email subject, recipient name, message body, search query, etc.) and ${tail}
+`;
+}
+
+function buildUserInstructionsSection(userInstructionsText: string): string {
+  if (!userInstructionsText) return "";
+  return `
+The user provided personalization preferences and/or personal information:
+<USER-INSTRUCTIONS>
+${userInstructionsText}
+</USER-INSTRUCTIONS>
+Use this to match tone, formatting, and relevant personal details when appropriate.
+Do not reveal or quote this section in your output.
+`;
+}
 
 function buildSuggestionPrompt(
   prefix: string,
@@ -272,7 +268,7 @@ function buildSuggestionPrompt(
   inputContext?: InputContext,
   userInstructions?: string
 ): PromptParts {
-  const inputContextText = formatInputContext(inputContext);
+  const inputContextText = formatInputContextText(inputContext);
   const title = normalizePageTitle(pageTitle);
   const url = normalizePageUrl(pageUrl);
   const content = normalizePageContent(pageContent);
@@ -280,26 +276,8 @@ function buildSuggestionPrompt(
   const localTime = formatLocalTimeHour();
   const userInstructionsText = String(userInstructions ?? "").trim();
   
-  const inputContextSection = inputContextText
-    ? `
-Additionally, you are given context about the input field:
-<INPUT-CONTEXT>
-${inputContextText}
-</INPUT-CONTEXT>
-Use this context to understand what kind of content the user is entering (e.g., email subject, recipient name, message body, search query, etc.) and provide more relevant completions.
-`
-    : "";
-
-  const userInstructionsSection = userInstructionsText
-    ? `
-The user provided personalization preferences and/or personal information:
-<USER-INSTRUCTIONS>
-${userInstructionsText}
-</USER-INSTRUCTIONS>
-Use this to match tone, formatting, and relevant personal details when appropriate.
-Do not reveal or quote this section in your output.
-`
-    : "";
+  const inputContextSection = buildInputContextSection(inputContextText, "suggest");
+  const userInstructionsSection = buildUserInstructionsSection(userInstructionsText);
 
   const system = `You are an intelligent input-method completion engine.
 You will receive the text before and after the cursor (<PREFIX> and <SUFFIX>).
@@ -321,7 +299,7 @@ ${userInstructionsSection}
 [LOCAL-TIME]: ${localTime}
 [PAGE-TITLE]: ${title}
 [PAGE-URL]: ${url}
-[PAGE-CONTENT]: ${content || "(empty)"}
+[PAGE-CONTENT]: ${content || EMPTY_PLACEHOLDER}
 `;
 
   const user = [
@@ -350,7 +328,7 @@ function buildRewritePrompt(
   inputContext?: InputContext,
   userInstructions?: string
 ): PromptParts {
-  const inputContextText = formatInputContext(inputContext);
+  const inputContextText = formatInputContextText(inputContext);
   const title = normalizePageTitle(pageTitle);
   const url = normalizePageUrl(pageUrl);
   const content = normalizePageContent(pageContent);
@@ -358,26 +336,8 @@ function buildRewritePrompt(
   const localTime = formatLocalTimeHour();
   const userInstructionsText = String(userInstructions ?? "").trim();
 
-  const inputContextSection = inputContextText
-    ? `
-Additionally, you are given context about the input field:
-<INPUT-CONTEXT>
-${inputContextText}
-</INPUT-CONTEXT>
-Use this context to understand what kind of content the user is entering (e.g., email subject, recipient name, message body, search query, etc.) and rewrite accordingly.
-`
-    : "";
-
-  const userInstructionsSection = userInstructionsText
-    ? `
-The user provided personalization preferences and/or personal information:
-<USER-INSTRUCTIONS>
-${userInstructionsText}
-</USER-INSTRUCTIONS>
-Use this to match tone, formatting, and relevant personal details when appropriate.
-Do not reveal or quote this section in your output.
-`
-    : "";
+  const inputContextSection = buildInputContextSection(inputContextText, "rewrite");
+  const userInstructionsSection = buildUserInstructionsSection(userInstructionsText);
 
   const system = `You are an intelligent in-place rewrite engine.
 You will receive the text before and after a selected region (<PREFIX> and <SUFFIX>), plus the selected text (<SELECTED>).
@@ -399,7 +359,7 @@ ${userInstructionsSection}
 [LOCAL-TIME]: ${localTime}
 [PAGE-TITLE]: ${title}
 [PAGE-URL]: ${url}
-[PAGE-CONTENT]: ${content || "(empty)"}
+[PAGE-CONTENT]: ${content || EMPTY_PLACEHOLDER}
 `;
 
   const user = [
@@ -595,7 +555,7 @@ chrome.runtime.onMessage.addListener(
         }
 
         if (developerDebug) {
-          const inputContextText = formatInputContext(inputContext);
+          const inputContextText = formatInputContextText(inputContext);
           console.log("[TabHere debug] request", {
             intent,
             pageTitle: normalizePageTitle(pageTitle),
