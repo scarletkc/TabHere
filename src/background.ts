@@ -576,9 +576,6 @@ chrome.runtime.onMessage.addListener(
             }
           }
 
-          if (intent === "suggest") {
-            return outputText.trimStart();
-          }
           return outputText;
         };
 
