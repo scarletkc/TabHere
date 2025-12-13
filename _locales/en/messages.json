@@ -11,6 +11,9 @@
 
   "baseUrlLabel": { "message": "Base URL" },
   "baseUrlPlaceholder": { "message": "https://api.openai.com/v1" },
+  "promoBaseUrlHintPrefix": { "message": "OpenAI-compatible third-party provider:" },
+  "promoBaseUrlHintLinkText": { "message": "SiliconFlowCN" },
+  "promoBaseUrlHintSuffix": { "message": "(promo)" },
 
   "modelLabel": { "message": "Model ID" },
   "modelPlaceholder": { "message": "gpt-5-nano" },

@@ -70,6 +70,16 @@
         font-size: 12px;
         margin-top: 2px;
       }
+      .hint a {
+        color: #06c;
+        text-decoration: none;
+      }
+      .hint a:hover {
+        text-decoration: underline;
+      }
+      .promo {
+        margin-top: 6px;
+      }
       .footer {
         margin-top: 16px;
         font-size: 12px;
@@ -98,6 +108,17 @@
         <label>
           <span data-i18n="baseUrlLabel">Base URL</span>
           <input id="baseUrl" type="text" data-i18n-placeholder="baseUrlPlaceholder" />
+          <div class="hint promo">
+            <span data-i18n="promoBaseUrlHintPrefix">OpenAI-compatible third-party provider:</span>
+            <a
+              href="https://cloud.siliconflow.cn/i/9O2PIRvM"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-i18n="promoBaseUrlHintLinkText"
+              >SiliconFlow</a
+            >
+            <span data-i18n="promoBaseUrlHintSuffix">(promo)</span>
+          </div>
         </label>
 
         <label>

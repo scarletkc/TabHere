@@ -11,6 +11,9 @@
 
   "baseUrlLabel": { "message": "Base URL" },
   "baseUrlPlaceholder": { "message": "https://api.openai.com/v1" },
+  "promoBaseUrlHintPrefix": { "message": "供应商推荐：" },
+  "promoBaseUrlHintLinkText": { "message": "硅基流动" },
+  "promoBaseUrlHintSuffix": { "message": "（广告）" },
 
   "modelLabel": { "message": "模型 ID" },
   "modelPlaceholder": { "message": "gpt-5-nano" },
