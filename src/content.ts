@@ -411,45 +411,66 @@ function getFieldName(el: HTMLElement): string | undefined {
  * 向上遍历 DOM 寻找最近的标题元素
  */
 function findNearbyHeading(el: HTMLElement): string | undefined {
+  const isHeadingTag = (tagName: string) => /^H[1-6]$/.test(tagName) || tagName === "LEGEND";
+
+  const extractHeadingText = (node: Element | null): string | undefined => {
+    if (!node) return undefined;
+
+    if (isHeadingTag(node.tagName)) {
+      const text = node.textContent?.trim();
+      if (text) return text;
+    }
+
+    const nested = node.querySelectorAll("h1, h2, h3, h4, h5, h6, legend");
+    for (let i = nested.length - 1; i >= 0; i--) {
+      const text = nested[i]?.textContent?.trim();
+      if (text) return text;
+    }
+
+    return undefined;
+  };
+
+  // 优先：closest fieldset 的 legend（更像“章节/分组标题”）
+  const closestFieldset = el.closest("fieldset");
+  if (closestFieldset) {
+    const legend = closestFieldset.querySelector(":scope > legend") || closestFieldset.querySelector("legend");
+    const text = legend?.textContent?.trim();
+    if (text) return text;
+  }
+
   let current: HTMLElement | null = el;
   let depth = 0;
 
   while (current && depth < MAX_ANCESTOR_DEPTH) {
     // 检查 legend (fieldset 标题)
     if (current.tagName === "FIELDSET") {
-      const legend = current.querySelector("legend");
-      if (legend) {
-        const text = legend.textContent?.trim();
-        if (text) return text;
-      }
+      const legend = current.querySelector(":scope > legend") || current.querySelector("legend");
+      const text = legend?.textContent?.trim();
+      if (text) return text;
     }
 
-    // 在当前元素之前查找标题
+    // 在当前元素之前查找标题（限制数量，避免扫描过多兄弟节点）
     let sibling: Element | null = current.previousElementSibling;
-    while (sibling) {
-      if (/^H[1-6]$/.test(sibling.tagName)) {
-        const text = sibling.textContent?.trim();
-        if (text) return text;
-      }
-      // 也检查 legend
-      if (sibling.tagName === "LEGEND") {
-        const text = sibling.textContent?.trim();
-        if (text) return text;
-      }
+    let scanned = 0;
+    while (sibling && scanned < 10) {
+      const text = extractHeadingText(sibling);
+      if (text) return text;
       sibling = sibling.previousElementSibling;
+      scanned++;
     }
 
     current = current.parentElement;
     depth++;
   }
 
-  // 最后尝试查找页面上最近的标题
-  const headings = document.querySelectorAll("h1, h2, h3, h4, h5, h6");
-  if (headings.length > 0) {
-    // 返回最后一个标题（通常是最接近内容的）
-    const lastHeading = headings[headings.length - 1];
-    const text = lastHeading.textContent?.trim();
-    if (text) return text;
+  // 兜底：返回 DOM 顺序上“在输入框之前的最近一个标题”
+  const headings = document.querySelectorAll("h1, h2, h3, h4, h5, h6, legend");
+  for (let i = headings.length - 1; i >= 0; i--) {
+    const heading = headings[i];
+    if (heading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) {
+      const text = heading.textContent?.trim();
+      if (text) return text;
+    }
   }
 
   return undefined;
