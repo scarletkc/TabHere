@@ -23,5 +23,6 @@ npm run version:set -- x.y.z  # 设置版本号
 ## 链接
 
 - [Chrome 扩展商店](https://chromewebstore.google.com/detail/oeokpncnejjfjdbpnchhldjdabhppnlb)
+- [隐私政策](https://github.com/scarletkc/TabHere/blob/main/docs/privacy-policy.md)
 - [路线图](https://github.com/scarletkc/TabHere/tree/main/docs/roadmap.md)
 - [MIT 许可证](https://github.com/scarletkc/TabHere/tree/main/LICENSE)

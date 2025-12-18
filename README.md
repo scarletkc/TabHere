@@ -23,5 +23,6 @@ In `chrome://extensions/` → enable **Developer mode** → **Load unpacked**, t
 ## Links
 
 - [Chrome Web Store](https://chromewebstore.google.com/detail/oeokpncnejjfjdbpnchhldjdabhppnlb)
+- [Privacy Policy](https://github.com/scarletkc/TabHere/blob/main/docs/privacy-policy.md)
 - [Roadmap](./docs/roadmap.md)
 - [MIT License](./LICENSE)
