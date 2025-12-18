@@ -34,18 +34,18 @@ TabHere stores your configuration in Chrome extension storage, including:
 
 - API key, base URL, model ID, max output tokens, temperature, trigger delay, minimum trigger characters, shortcut key.
 - Allowed/blocked site lists.
-- “Disable on sensitive inputs” setting.
-- “Developer debug mode” setting.
+- "Disable on sensitive inputs" setting.
+- "Developer debug mode" setting.
 - Optional personalization text you enter in settings (this is included in the system prompt and sent to your configured AI provider).
 
 ### Debug logs (local only)
 
-If “Developer debug mode” is enabled, TabHere writes request/response details and prompt text to the browser console. These logs are not transmitted to the TabHere developer, but they may contain sensitive information because they reflect the text you typed and page context.
+If "Developer debug mode" is enabled, TabHere writes request/response details and prompt text to the browser console. These logs are not transmitted to the TabHere developer, but they may contain sensitive information because they reflect the text you typed and page context.
 
 ## How TabHere uses the data
 
 - To generate autocomplete/rewrite suggestions and display them in the page.
-- To test your API settings when you click “Test API”.
+- To test your API settings when you click "Test API".
 
 ## Where the data is sent
 
@@ -56,14 +56,14 @@ TabHere does not send your data to any servers controlled by the TabHere develop
 
 ## Storage and retention
 
-- Extension settings are stored in `chrome.storage.local` or `chrome.storage.sync` depending on your “Sync settings & API key” option. When sync is enabled, Google/Chrome may synchronize these settings across your signed-in browsers.
+- Extension settings are stored in `chrome.storage.local` or `chrome.storage.sync` depending on your "Sync settings & API key" option. When sync is enabled, Google/Chrome may synchronize these settings across your signed-in browsers.
 - TabHere keeps a short-lived in-memory cache of recent suggestions (about 30 seconds) to reduce duplicate requests. This cache is not written to disk.
 - TabHere does not implement a server-side history, account system, or centralized database.
 
 ## Your choices and controls
 
-- You can restrict where TabHere runs using “Allowed sites” and “Blocked sites”.
-- “Disable on sensitive inputs (password/OTP)” is enabled by default; you can change it in settings.
+- You can restrict where TabHere runs using "Allowed sites" and "Blocked sites".
+- "Disable on sensitive inputs (password/OTP)" is enabled by default; you can change it in settings.
 - You can remove your data by clearing the extension’s storage (Chrome → Extensions → TabHere) or by uninstalling the extension.
 
 ## Security
